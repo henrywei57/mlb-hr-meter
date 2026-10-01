@@ -10,6 +10,7 @@ import { getSettings } from "../settings.js";
 import { loadCalls, saveCalls, newCall, withCall, withoutPending, resolveCalls, pointsFor, callId, KINDS } from "../calls.js";
 import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
+import { sceneHtml } from "./scene.js";
 
 const handWord = (h) => (h === "L" ? "Left" : "Right");
 
@@ -35,6 +36,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     </div>
     <div id="banner" class="banner" hidden></div>
     <section id="score" class="card score"></section>
+    <section id="scene" class="card scene" hidden></section>
     <section id="matchup" class="card"></section>
     <section id="meter" class="card meter">
       <div class="meter-number" id="m-num">–</div>
@@ -91,6 +93,27 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     const chip = $("chip");
     chip.textContent = s.isFinal ? "Final" : s.isLive ? "Live" : s.statusLabel;
     chip.className = "chip " + (s.isLive ? "live" : "");
+  }
+
+  // The pitcher/batter cartoon. Only redrawn when something visible changes, so its animations
+  // (the pitch, the idle bobbing) aren't restarted by every 7-second refresh.
+  let sceneKey = null;
+  function drawScene(s) {
+    const el = $("scene");
+    if (!s.current || !s.isLive) { el.hidden = true; sceneKey = null; return; }
+    const awayBats = /^Top/.test(s.inningLabel);
+    const battingTeam = awayBats ? s.away : s.home;
+    const fieldingTeam = awayBats ? s.home : s.away;
+    const scene = sceneHtml({
+      batSide: s.current.batter.side,
+      pitchHand: s.current.pitcher.hand,
+      balls: s.balls, strikes: s.strikes, outs: s.outs,
+      batColor: teamColor(colors, battingTeam.id),
+      pitchColor: teamColor(colors, fieldingTeam.id),
+      spike: s.current.prediction.timesLeague >= getSettings().spikeMultiple,
+    });
+    el.hidden = false;
+    if (scene.key !== sceneKey) { el.innerHTML = scene.html; sceneKey = scene.key; }
   }
 
   function drawMatchup(s) {
@@ -282,6 +305,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   function draw() {
     if (!state) return;
     drawScore(state);
+    drawScene(state);
     drawMatchup(state);
     drawMeter(state);
     drawCallBox(state);

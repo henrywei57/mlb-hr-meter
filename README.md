@@ -41,6 +41,7 @@ To pick up a new version, close the app fully and reopen it while online.
 
 ## Interactive features
 
+- **Matchup scene:** a pitcher and batter in team colors that react to the count. In a hitter's count (2-0, 2-1, 3-1) the batter swings loose and the pitcher sweats; in a pitcher's count (0-2, 1-2) the pitcher looks confident and the batter chokes up; a full count makes both tense. A ball is thrown whenever the count changes. Handedness comes straight from the data: from the center-field camera a **right-handed batter stands on the right of the plate and a lefty on the left**, with the bat held away from the plate, and the pitcher's **ball hand is on his throwing side**. The ball, strike and out dots and a caption sit with it. Code: `src/ui/scene.js`.
 - **Two smaller meters** under the home run meter: **Expected total bases** (single = 1, double = 2, triple = 3, home run = 4) and **Strikeout chance**. They use the same recipe as the home run number: league average, then batter, pitcher, lefty/righty, count and park.
 - **Make a call** on any of three things before the at-bat ends: a **home run**, a **strikeout**, or **2+ bases** (an extra-base hit). A hit pays `1 ÷ chance` points (a 4% long shot is +25), a miss costs 1. Tap a Call button again to undo it. A pop-up tells you how it turned out, and the history list marks the at-bats you called.
 - **My calls** (`#/calls`, or the 📊 button): points, hit rate, best streak, best call, your hits vs the hits the model expected, and a breakdown by type of call. Demo calls can be hidden, and everything can be reset. Saved on the device only (no accounts).
@@ -63,7 +64,7 @@ src/
   gamestate.js   turns MLB's giant feed JSON into one small "game state" object
   sources.js     liveSource (polls MLB) and demoSource (replays a saved game)
   api.js         all network calls
-  ui/            home.js (Today's Games), game.js (game screen), calls.js (My calls), why.js, diamond.js
+  ui/            home.js (Today's Games), game.js (game screen), calls.js (My calls), scene.js (batter/pitcher cartoon), why.js, diamond.js
 public/
   data/rates.json         precomputed rates (made by scripts/build_rates.py)
   data/demo_game.json     saved playoff game for Demo mode

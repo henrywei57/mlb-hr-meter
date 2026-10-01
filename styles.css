@@ -242,3 +242,41 @@ select { display: block; margin-top: 6px; width: 100%; min-height: 44px; font: i
 .kind-table th { text-align: right; color: var(--muted); font-weight: 600; font-size: 12px; padding: 4px 2px; }
 .kind-table td { text-align: right; padding: 8px 2px; border-top: 1px solid var(--card-edge); font-variant-numeric: tabular-nums; }
 .kind-table th:first-child, .kind-table td:first-child { text-align: left; }
+
+/* ---------- Pitcher / batter scene ---------- */
+.scene { padding: 0; overflow: hidden; }
+.scene-svg { display: block; width: 100%; height: auto; }
+.scene .box { fill: none; stroke: #f4f4f0; stroke-width: 1.5; opacity: 0.55; }
+.scene .leg { stroke: #d9dde3; stroke-width: 6; stroke-linecap: round; }
+.scene .arm { stroke-width: 5.5; stroke-linecap: round; }
+.scene .body { stroke: rgba(0, 0, 0, 0.25); stroke-width: 1; }
+.scene .bat { stroke: #c8a46a; stroke-width: 5; stroke-linecap: round; }
+.scene .bat.glow { stroke: #ffd9a8; filter: drop-shadow(0 0 5px #ff7a1a) drop-shadow(0 0 9px #ff7a1a); }
+.scene .eye { fill: #1a1405; }
+.scene .brow, .scene .mouth { fill: none; stroke: #1a1405; stroke-width: 1.6; stroke-linecap: round; }
+.scene .sweat { fill: #7fc4ff; }
+.scene .bubble circle { fill: rgba(255, 255, 255, 0.92); }
+.scene .bubble text { font-size: 14px; }
+.scene .ball-in-hand { fill: #f6f6f2; stroke: #c33; stroke-width: 0.8; }
+.scene .ball { fill: #f6f6f2; stroke: #c33; stroke-width: 0.8; opacity: 0; transform-box: fill-box; transform-origin: center; animation: throw 0.8s ease-in 0.15s 1 both; }
+.scene .dot { fill: transparent; stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.4; }
+.scene .dot.on.ball-dot { fill: #4bd37b; stroke: #4bd37b; }
+.scene .dot.on.strike-dot { fill: #ff5a5f; stroke: #ff5a5f; }
+.scene .dot.on.out-dot { fill: var(--accent); stroke: var(--accent); }
+.scene .dot-label { font: 700 8px -apple-system, "Segoe UI", sans-serif; fill: rgba(255, 255, 255, 0.75); letter-spacing: 0.08em; }
+.scene-caption { padding: 10px 14px 2px; font-size: 14px; color: var(--muted); }
+.scene-caption b { color: var(--text); font-size: 16px; margin-right: 4px; }
+.scene-hands { display: flex; justify-content: space-between; padding: 4px 14px 12px; font-size: 13px; color: var(--muted); }
+.scene-hands b { color: var(--text); }
+
+.scene .bob { animation: bob 2.6s ease-in-out infinite; }
+.scene .shake { animation: jitter 0.3s linear infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+@keyframes jitter { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(0.8px, -0.8px); } 75% { transform: translate(-0.8px, -0.4px); } }
+@keyframes throw {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.5); }
+}
+@media (prefers-reduced-motion: reduce) { .scene .bob, .scene .shake, .scene .ball { animation: none; } .scene .ball { display: none; } }

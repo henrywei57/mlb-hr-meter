@@ -18,7 +18,7 @@ export function showCalls(root) {
     const verdict = s.total === 0
       ? "Make a call on any at-bat and it will show up here."
       : `You've hit <b>${s.hits}</b> of <b>${s.total}</b> (${rate(s.hitRate)}). The model expected about <b>${s.expectedHits.toFixed(1)}</b> hits from those calls (avg ${pct(s.avgChance)} each).`
-        + (s.total < 5 ? "" : s.hits > s.expectedHits + 0.5 ? " You're beating the odds. 🔥" : s.hits < s.expectedHits - 0.5 ? " Running a bit cold so far." : "");
+        + (s.total < 5 ? "" : s.hits > s.expectedHits + 0.5 ? " You're beating the odds." : s.hits < s.expectedHits - 0.5 ? " Running a bit cold so far." : "");
 
     // One line per kind of call: how you do on home runs vs strikeouts vs extra-base hits.
     const byKind = Object.entries(KINDS).map(([kind, info]) => {
@@ -35,7 +35,7 @@ export function showCalls(root) {
         <div class="call-outcome">
           ${c.status === "pending"
             ? `<span class="muted">Waiting…</span>${c.isDemo ? "" : `<a href="#/game/${esc(c.gamePk)}">Open game</a>`}`
-            : `<b>${c.status === "hit" ? "✅ Hit" : "Miss"}</b><small>${esc(c.resultText)} · ${pointsFor(c) > 0 ? "+" : ""}${pointsFor(c)} pts</small>`}
+            : `<b>${c.status === "hit" ? "Hit" : "Miss"}</b><small>${esc(c.resultText)} · ${pointsFor(c) > 0 ? "+" : ""}${pointsFor(c)} pts</small>`}
         </div>
       </li>`).join("");
 

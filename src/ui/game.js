@@ -10,7 +10,7 @@ import { getSettings } from "../settings.js";
 import { loadCalls, saveCalls, newCall, withCall, withoutPending, resolveCalls, pointsFor, callId, KINDS } from "../calls.js";
 import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
-import { sceneHtml } from "./scene.js";
+import { sceneHtml, resultSceneHtml, playResult } from "./scene.js";
 
 const handWord = (h) => (h === "L" ? "Left" : "Right");
 
@@ -26,7 +26,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   root.innerHTML = `
     <header class="top">
       <a class="back" href="#/">‹ Games</a>
-      <span class="header-right"><a class="calls-link" href="#/calls">📊 My calls</a><span id="chip" class="chip"></span></span>
+      <span class="header-right"><a class="calls-link" href="#/calls">My calls</a><span id="chip" class="chip"></span></span>
     </header>
     <div id="demo-bar" class="demo-bar" hidden>
       <span>Demo replay</span>
@@ -102,8 +102,13 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   // The pitcher/batter cartoon. Only redrawn when something visible changes, so its animations
   // (the pitch, the idle bobbing) aren't restarted by every 7-second refresh.
   let sceneKey = null;
+  let sceneBusyUntil = 0;   // while a hit replay is playing, leave the scene alone
+  let sceneTimer = null;
+  let seenHistory = null;   // how many finished at-bats we'd already seen (to spot new ones)
+
   function drawScene(s) {
     const el = $("scene");
+    if (Date.now() < sceneBusyUntil) return;
     if (!s.current || !s.isLive) { el.hidden = true; sceneKey = null; return; }
     const awayBats = /^Top/.test(s.inningLabel);
     const battingTeam = awayBats ? s.away : s.home;
@@ -111,6 +116,8 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     const scene = sceneHtml({
       batSide: s.current.batter.side,
       pitchHand: s.current.pitcher.hand,
+      batterId: s.current.batter.id,
+      pitcherId: s.current.pitcher.id,
       balls: s.balls, strikes: s.strikes, outs: s.outs,
       batColor: teamColor(colors, battingTeam.id),
       pitchColor: teamColor(colors, fieldingTeam.id),
@@ -118,6 +125,32 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     });
     el.hidden = false;
     if (scene.key !== sceneKey) { el.innerHTML = scene.html; sceneKey = scene.key; }
+  }
+
+  // When a new at-bat finishes with a hit, replay it in the scene: the swing and the ball flying out.
+  function checkForNewHit(s) {
+    if (seenHistory === null || s.history.length < seenHistory) { seenHistory = s.history.length; return; } // first load or demo restart
+    const fresh = s.history.slice(seenHistory);
+    seenHistory = s.history.length;
+    const row = [...fresh].reverse().find((r) => r.hit);
+    if (!row) return;
+    const battingTeam = row.isTop ? s.away : s.home;
+    const fieldingTeam = row.isTop ? s.home : s.away;
+    const replay = resultSceneHtml({
+      batSide: row.situation.batSide, pitchHand: row.situation.pitchHand,
+      batterId: row.situation.batterId, pitcherId: row.situation.pitcherId, batterName: row.batterName,
+      balls: 0, strikes: 0, outs: s.outs,
+      batColor: teamColor(colors, battingTeam.id), pitchColor: teamColor(colors, fieldingTeam.id),
+      hit: row.hit,
+    });
+    const el = $("scene");
+    el.hidden = false;
+    el.innerHTML = replay.html;
+    sceneKey = null; // the normal scene must redraw afterwards
+    playResult(el);
+    sceneBusyUntil = Date.now() + replay.durationMs;
+    clearTimeout(sceneTimer);
+    sceneTimer = setTimeout(() => { sceneBusyUntil = 0; if (state) drawScene(state); }, replay.durationMs);
   }
 
   function drawMatchup(s) {
@@ -226,7 +259,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
       const chance = chanceFor(kind, s.current);
       if (chance == null) return "";
       return pendingCall(s, kind)
-        ? `<button type="button" class="call-small made" data-call="${kind}">✅ Called · tap to undo</button>`
+        ? `<button type="button" class="call-small made" data-call="${kind}">Called · tap to undo</button>`
         : `<button type="button" class="call-small" data-call="${kind}">${text}<small>+${payoutFor(chance)} pts if right</small></button>`;
     };
     const xbh = s.current.extraBase;
@@ -253,12 +286,12 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     const payout = payoutFor(s.current.prediction.value);
     if (mine) {
       box.innerHTML = `
-        <div class="call-made">✅ You called a <b>home run</b> for ${esc(s.current.batter.name)}.
+        <div class="call-made">You called a <b>home run</b> for ${esc(s.current.batter.name)}.
           <span class="muted">Locked in at ${pct(mine.chance)} chance, worth +${Math.round(1 / Math.max(mine.chance, 0.01))} pts.</span></div>
         <button type="button" class="ghost" data-call="hr">Undo call</button>`;
     } else {
       box.innerHTML = `
-        <button type="button" class="call-button" data-call="hr">💥 Call a home run<small>+${payout} pts if ${esc(s.current.batter.name)} homers, −1 if not</small></button>
+        <button type="button" class="call-button" data-call="hr">Call a home run<small>+${payout} pts if ${esc(s.current.batter.name)} homers, −1 if not</small></button>
         ${source.isDemo ? `<p class="note">Tip: pause the demo to take your time.</p>` : ""}`;
     }
   }
@@ -272,7 +305,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     toast.className = "toast " + (call.status === "hit" ? "win" : "lose");
     const kind = KINDS[call.kind] || KINDS.hr;
     toast.textContent = call.status === "hit"
-      ? `🎉 You called it! ${call.batterName} ${kind.verb}. +${points} pts`
+      ? `You called it! ${call.batterName} ${kind.verb}. +${points} pts`
       : `${call.batterName}: ${call.resultText}. Your ${kind.label} call missed (${points} pt).`;
     toast.hidden = false;
     if (call.status === "hit") buzz([100, 60, 100, 60, 300]);
@@ -297,9 +330,9 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
             <div class="hist-batter">${esc(row.batterName)}</div>
             <div class="hist-sub">${esc(row.inning)} · vs ${esc(row.pitcherName)}</div>
           </div>
-          <div class="hist-result ${row.isHR ? "hr" : ""}">${row.isHR ? "💥 HOME RUN" : esc(row.result)}</div>
+          <div class="hist-result ${row.isHR ? "hr" : ""}">${row.isHR ? "HOME RUN" : esc(row.result)}</div>
           <div class="hist-pred" title="Predicted chance before the first pitch">${pct(row.prediction.probability)}<small>chance</small></div>
-          ${mine.map((c) => `<span class="hist-call ${c.status}">${c.status === "hit" ? "✅ called" : "❌ missed"} ${esc(KINDS[c.kind].short)}</span>`).join("")}
+          ${mine.map((c) => `<span class="hist-call ${c.status}">${c.status === "hit" ? "Called" : "Missed"} ${esc(KINDS[c.kind].short)}</span>`).join("")}
           ${open ? `<p class="hist-desc">${esc(row.description)}${p ? `<br>Before the first pitch: HR ${pct(p.hr.value)} · strikeout ${pct(p.k.value)} · ${p.tb.value.toFixed(2)} expected bases` : ""}</p>` : ""}
         </li>`;
     }).join("");
@@ -343,6 +376,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
         saveCalls(calls);
         showToast(resolved.settled);
       }
+      checkForNewHit(newState);
       draw();
     },
     onError() {
@@ -412,5 +446,5 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   });
 
   source.start();
-  return () => { clearInterval(clock); clearTimeout(toastTimer); document.removeEventListener("keydown", onKey); source.stop(); }; // called when leaving this screen
+  return () => { clearInterval(clock); clearTimeout(toastTimer); clearTimeout(sceneTimer); document.removeEventListener("keydown", onKey); source.stop(); }; // called when leaving this screen
 }

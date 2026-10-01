@@ -255,8 +255,6 @@ select { display: block; margin-top: 6px; width: 100%; min-height: 44px; font: i
 .scene .eye { fill: #1a1405; }
 .scene .brow, .scene .mouth { fill: none; stroke: #1a1405; stroke-width: 1.6; stroke-linecap: round; }
 .scene .sweat { fill: #7fc4ff; }
-.scene .bubble circle { fill: rgba(255, 255, 255, 0.92); }
-.scene .bubble text { font-size: 14px; }
 .scene .ball-in-hand { fill: #f6f6f2; stroke: #c33; stroke-width: 0.8; }
 .scene .ball { fill: #f6f6f2; stroke: #c33; stroke-width: 0.8; opacity: 0; transform-box: fill-box; transform-origin: center; animation: throw 0.8s ease-in 0.15s 1 both; }
 .scene .dot { fill: transparent; stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.4; }
@@ -335,3 +333,13 @@ kbd { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; b
   .hist-row:hover { filter: brightness(1.25); }
   .why-row:hover { background: rgba(255, 255, 255, 0.04); }
 }
+
+/* ---------- Scene: photos, labels and the hit replay ---------- */
+.scene .pill rect { fill: rgba(255, 255, 255, 0.92); }
+.scene .pill text { font: 700 7.5px -apple-system, "Segoe UI", sans-serif; fill: #151a24; }
+.scene image { image-rendering: auto; }
+.scene .hit-ball { fill: #fff; stroke: #d33; stroke-width: 1; filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.95)); }
+.scene .banner-main { font: 800 18px -apple-system, "Segoe UI", sans-serif; fill: #fff; stroke: rgba(0, 0, 0, 0.55); stroke-width: 3px; paint-order: stroke; letter-spacing: 0.06em; }
+.scene .banner-sub { font: 700 11px -apple-system, "Segoe UI", sans-serif; fill: #fff; stroke: rgba(0, 0, 0, 0.55); stroke-width: 3px; paint-order: stroke; }
+.scene .hit-banner.hr .banner-main { font-size: 28px; fill: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .scene .hit-ball { display: none; } }

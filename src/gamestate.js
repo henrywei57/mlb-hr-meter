@@ -21,6 +21,22 @@ const NOT_A_PA = ["caught_stealing", "pickoff", "stolen_base", "wild_pitch", "pa
 
 const BASES_BY_EVENT = { single: 1, double: 2, triple: 3, home_run: 4 };
 
+// For a hit (single, double, triple, home run): how the ball was hit, so the scene can replay it.
+// MLB's feed has the distance, exit speed, launch angle and landing spot of the batted ball.
+function hitDetails(play) {
+  const event = play.result.eventType;
+  if (!BASES_BY_EVENT[event]) return null;
+  const data = [...(play.playEvents || [])].reverse().find((e) => e.hitData)?.hitData;
+  return {
+    event,
+    dist: data?.totalDistance,
+    speed: data?.launchSpeed,
+    angle: data?.launchAngle,
+    x: data?.coordinates?.coordX,
+    y: data?.coordinates?.coordY,
+  };
+}
+
 export function isPlateAppearance(play) {
   const type = play.result?.eventType || "";
   return play.about.isComplete && !NOT_A_PA.some((prefix) => type.startsWith(prefix));
@@ -59,6 +75,7 @@ function historyRow(play, venueId) {
     isHR: play.result.eventType === "home_run",
     isK: (play.result.eventType || "").startsWith("strikeout"),
     bases: BASES_BY_EVENT[play.result.eventType] || 0, // total bases the batter got
+    hit: hitDetails(play),
     // The history shows the chance BEFORE the first pitch, so every row is judged at 0-0.
     situation: {
       batterId: String(play.matchup.batter.id),

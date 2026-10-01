@@ -1,0 +1,5 @@
+.claude/
+scripts/cache/
+scripts/build.log
+node_modules/
+__pycache__/

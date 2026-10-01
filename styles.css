@@ -1,0 +1,150 @@
+/* Mobile-first dark theme. Designed for a 360px-wide phone; wider screens just get margins.
+   Colors are variables at the top so a redesign from Figma is a quick swap. */
+
+:root {
+  --bg: #0f1218;
+  --card: #1a1f2a;
+  --card-edge: #2a3140;
+  --text: #f2f4f8;
+  --muted: #a3acbd;       /* contrast on --card: about 7:1 */
+  --accent: #ffcf4a;      /* gold: runners, highlights */
+  --spike: #ff7a1a;       /* orange glow for a spike */
+  --up: #ff9d4d;          /* factor makes a homer MORE likely */
+  --down: #6cb4ff;        /* factor makes a homer LESS likely */
+  --live: #ff4d5e;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* keep content out of the iPhone notch / home bar when installed */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+#app { max-width: 520px; margin: 0 auto; padding: 12px 12px 40px; }
+
+a { color: var(--accent); }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.hint { color: var(--muted); font-size: 14px; margin: 4px 0 10px; }
+.pad { padding: 24px 4px; }
+.note { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+
+.top { display: flex; align-items: center; justify-content: space-between; padding: 6px 2px 12px; }
+.back { text-decoration: none; font-weight: 600; padding: 8px 8px 8px 0; }
+
+.chip { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--card); color: var(--muted); text-transform: uppercase; }
+.chip.live { background: var(--live); color: #fff; }
+
+.card { background: var(--card); border: 1px solid var(--card-edge); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+
+.banner { background: #4a3410; color: #ffe2a8; border: 1px solid #7a5a1c; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
+
+/* ---------- Today's Games ---------- */
+.demo-button {
+  display: block; text-decoration: none; background: var(--accent); color: #1a1405;
+  font-weight: 800; padding: 14px; border-radius: var(--radius); margin-bottom: 14px;
+}
+.demo-button small { display: block; font-weight: 500; opacity: 0.8; }
+
+.game-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--card); border: 1px solid var(--card-edge); border-radius: var(--radius);
+  padding: 14px; margin-bottom: 10px; color: var(--text); text-decoration: none;
+}
+.game-card.live { border-color: var(--live); }
+.teams { flex: 1; min-width: 0; }
+.team-line { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; padding: 2px 0; }
+.team-line b { font-variant-numeric: tabular-nums; }
+.status { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.status.live { color: var(--live); font-weight: 700; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--live); margin-right: 6px; }
+
+/* ---------- Score + situation ---------- */
+.score { padding: 0; overflow: hidden; }
+.teams-row { display: grid; grid-template-columns: 1fr 1fr; }
+.team { padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.team-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-score { font-size: 38px; line-height: 1; font-variant-numeric: tabular-nums; }
+.team.batting .team-name { text-decoration: underline; text-underline-offset: 3px; }
+.situation { display: flex; align-items: center; gap: 16px; padding: 12px 14px; }
+.diamond { width: 72px; height: 63px; flex: none; }
+.base { fill: transparent; stroke: var(--muted); stroke-width: 2; }
+.base.on { fill: var(--accent); stroke: var(--accent); }
+.plate { fill: var(--muted); }
+.inning { font-weight: 700; font-size: 17px; }
+.outs { display: flex; align-items: center; gap: 5px; margin: 2px 0; font-size: 14px; }
+.outs span { margin-left: 4px; color: var(--muted); }
+.out { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--muted); }
+.out.on { background: var(--accent); border-color: var(--accent); }
+.count { font-size: 14px; }
+.count b { font-size: 16px; }
+
+/* ---------- Matchup ---------- */
+.matchup-head { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+.role { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.player { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
+.right { text-align: right; }
+.hands { background: var(--bg); border: 1px solid var(--card-edge); border-radius: 8px; padding: 4px 8px; font-weight: 800; font-size: 14px; white-space: nowrap; }
+.stat-line { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.stat-line b { color: var(--text); font-size: 15px; }
+
+/* ---------- Home Run Meter ---------- */
+.meter { text-align: center; padding: 18px 14px 16px; border-width: 2px; transition: box-shadow 0.3s, border-color 0.3s; }
+.meter-number { font-size: 84px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.meter-label { font-size: 17px; font-weight: 600; margin-top: 6px; }
+.meter-times { color: var(--accent); font-weight: 700; margin-top: 6px; min-height: 1.4em; }
+.meter-ref { color: var(--muted); font-size: 14px; margin-top: 6px; }
+.meter-updated { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.estimate { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--muted); color: var(--muted); vertical-align: middle; text-transform: uppercase; }
+
+/* Spike: the glow pulses. The pulse is turned off for people who asked for less motion,
+   but they still get the static glow. */
+.meter.spike { border-color: var(--spike); box-shadow: 0 0 22px 2px rgba(255, 122, 26, 0.55); animation: pulse 1.2s ease-in-out infinite; }
+.meter.spike .meter-number { color: #ffd2a8; text-shadow: 0 0 18px rgba(255, 122, 26, 0.8); }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 14px 0 rgba(255, 122, 26, 0.35); }
+  50% { box-shadow: 0 0 34px 8px rgba(255, 122, 26, 0.85); }
+}
+@media (prefers-reduced-motion: reduce) { .meter.spike { animation: none; } }
+
+/* ---------- Why ---------- */
+.why-list, .hist-list { list-style: none; margin: 0; padding: 0; }
+.why-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; padding: 9px 0; border-top: 1px solid var(--card-edge); }
+.why-arrow { font-size: 12px; text-align: center; }
+.why-value { font-weight: 800; font-variant-numeric: tabular-nums; }
+.why-row.up .why-arrow, .why-row.up .why-value { color: var(--up); }
+.why-row.down .why-arrow, .why-row.down .why-value { color: var(--down); }
+.why-row.flat { color: var(--muted); }
+
+/* ---------- History ---------- */
+.hist-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 10px 10px 12px; margin-top: 8px; border-radius: 10px; background: var(--bg); border-left: 6px solid var(--team); }
+.hist-batter { font-weight: 700; overflow-wrap: anywhere; }
+.hist-sub { font-size: 12px; color: var(--muted); }
+.hist-result { font-size: 14px; text-align: right; }
+.hist-pred { font-weight: 800; text-align: right; min-width: 44px; font-variant-numeric: tabular-nums; }
+.hist-pred small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
+.hist-row.hr { background: #3a2a08; outline: 2px solid var(--accent); }
+.hist-result.hr { color: var(--accent); font-weight: 800; }
+
+/* ---------- Demo controls ---------- */
+.demo-bar { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px dashed var(--accent); border-radius: 10px; padding: 8px 10px; margin-bottom: 12px; font-weight: 700; font-size: 14px; }
+[hidden] { display: none !important; }
+.spacer { flex: 1; }
+button { font: inherit; font-weight: 700; font-size: 14px; color: var(--text); background: var(--bg); border: 1px solid var(--card-edge); border-radius: 8px; padding: 8px 14px; min-height: 40px; }
+button:active { background: var(--card-edge); }
+
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 359px) {
+  .meter-number { font-size: 68px; }
+  .team-score { font-size: 32px; }
+}

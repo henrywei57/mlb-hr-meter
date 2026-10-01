@@ -1,0 +1,11 @@
+{
+  "name": "mlb-hr-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Live MLB home run probability tracker (prototype PWA)",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "node scripts/serve.js"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "HR Meter - live home run chance",
+  "short_name": "HR Meter",
+  "description": "Live home run chance for the MLB at-bat you're watching.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1218",
+  "theme_color": "#0f1218",
+  "icons": [
+    { "src": "public/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "public/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "public/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

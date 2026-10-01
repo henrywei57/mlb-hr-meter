@@ -108,6 +108,7 @@ export function stateFromLiveFeed(feed) {
     state.balls = play.count.balls;
     state.strikes = play.count.strikes;
     state.current = {
+      atBatIndex: play.atBatIndex,
       batter: { id: String(play.matchup.batter.id), name: play.matchup.batter.fullName, side: play.matchup.batSide.code },
       pitcher: { id: String(play.matchup.pitcher.id), name: play.matchup.pitcher.fullName, hand: play.matchup.pitchHand.code },
     };
@@ -118,6 +119,7 @@ export function stateFromLiveFeed(feed) {
     const pitchHand = gd.players["ID" + pitcher.id]?.pitchHand?.code || "R";
     state.outs = Math.min(line.outs ?? 0, 2);
     state.current = {
+      atBatIndex: (play?.atBatIndex ?? -1) + 1, // the at-bat after the one that just finished
       batter: { id: String(batter.id), name: batter.fullName, side: batSideFor(gd.players["ID" + batter.id], pitchHand) },
       pitcher: { id: String(pitcher.id), name: pitcher.fullName, hand: pitchHand },
     };
@@ -187,6 +189,7 @@ export function demoStateAt(feed, frames, step, phase = 1) {
   state.strikes = phase === 0 ? 0 : f.countBefore.strikes;
   state.runners = { first: f.bases["1B"], second: f.bases["2B"], third: f.bases["3B"] };
   state.current = {
+    atBatIndex: p.atBatIndex,
     batter: { id: String(p.matchup.batter.id), name: p.matchup.batter.fullName, side: p.matchup.batSide.code },
     pitcher: { id: String(p.matchup.pitcher.id), name: p.matchup.pitcher.fullName, hand: p.matchup.pitchHand.code },
   };

@@ -2,6 +2,8 @@
 
 import { fetchSchedule } from "../api.js";
 import { esc, localDateString, saveLocal, loadLocal } from "../util.js";
+import { getSettings, saveSettings } from "../settings.js";
+import { loadCalls, computeStats } from "../calls.js";
 
 const REFRESH_MS = 30000;
 
@@ -16,6 +18,11 @@ function statusInfo(game) {
   const time = new Date(game.gameDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const odd = ["Postponed", "Suspended", "Cancelled"].includes(game.status.detailedState);
   return { rank: 1, text: odd ? game.status.detailedState : time, kind: "upcoming" };
+}
+
+function callsSummary() {
+  const s = computeStats(loadCalls());
+  return s.total ? `${s.hits} of ${s.total} called right · ${s.points} pts` : "call a homer before an at-bat and track your record";
 }
 
 function sortGames(games) {
@@ -47,8 +54,20 @@ export function showHome(root) {
   root.innerHTML = `
     <header class="top"><h1>Today's Games</h1></header>
     <a class="demo-button" href="#/demo">▶ Demo game <small>replay a real playoff game with 4 home runs</small></a>
+    <a class="calls-button" href="#/calls">📊 My calls <small>${callsSummary()}</small></a>
+    <details class="card settings">
+      <summary>⚙ Settings</summary>
+      <label class="setting">Glow and buzz when the chance is at least
+        <select id="spike-select">
+          ${[1.5, 2, 3, 4].map((m) => `<option value="${m}" ${getSettings().spikeMultiple === m ? "selected" : ""}>${m}x the league average</option>`).join("")}
+        </select>
+      </label>
+      <label class="check setting"><input type="checkbox" id="vibrate-toggle" ${getSettings().vibrate ? "checked" : ""}> Vibrate (Android only; iPhone doesn't support it)</label>
+    </details>
     <div id="notice" class="banner" hidden></div>
     <div id="games"><p class="hint">Loading games…</p></div>`;
+  root.querySelector("#spike-select").addEventListener("change", (e) => saveSettings({ spikeMultiple: Number(e.target.value) }));
+  root.querySelector("#vibrate-toggle").addEventListener("change", (e) => saveSettings({ vibrate: e.target.checked }));
   const gamesEl = root.querySelector("#games");
   const noticeEl = root.querySelector("#notice");
 

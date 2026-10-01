@@ -2,11 +2,13 @@
 //   #/            -> Today's Games
 //   #/game/12345  -> live game with that gamePk
 //   #/demo        -> replay of the saved demo game
+//   #/calls       -> your home run calls and stats
 
 import { loadRates, loadTeamColors } from "./api.js";
 import { liveSource, demoSource } from "./sources.js";
 import { showHome } from "./ui/home.js";
 import { showGame } from "./ui/game.js";
+import { showCalls } from "./ui/calls.js";
 
 const app = document.getElementById("app");
 let leaveScreen = null; // cleanup function of the screen currently shown (stops timers / polling)
@@ -19,6 +21,14 @@ const loadData = () => (dataPromise ??= Promise.all([loadRates(), loadTeamColors
   throw error;
 }));
 
+// Every screen gets its own fresh container, so event listeners from the previous screen
+// can never pile up on the shared #app element.
+function freshScreen() {
+  const el = document.createElement("div");
+  app.replaceChildren(el);
+  return el;
+}
+
 async function route() {
   const token = ++routeToken;
   if (leaveScreen) { leaveScreen(); leaveScreen = null; }
@@ -28,8 +38,13 @@ async function route() {
   const game = hash.match(/^#\/game\/(\d+)$/);
   const isDemo = hash === "#/demo";
 
+  if (hash === "#/calls") {
+    leaveScreen = showCalls(freshScreen());
+    return;
+  }
+
   if (!game && !isDemo) {
-    leaveScreen = showHome(app);
+    leaveScreen = showHome(freshScreen());
     return;
   }
 
@@ -46,7 +61,7 @@ async function route() {
   if (token !== routeToken) return; // user navigated away while data was loading
 
   const gamePk = isDemo ? "demo" : game[1];
-  leaveScreen = showGame(app, {
+  leaveScreen = showGame(freshScreen(), {
     gamePk,
     rates,
     colors,

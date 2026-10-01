@@ -39,23 +39,36 @@ After changing code, push again. If you **add a new file** that should work offl
 
 To pick up a new version, close the app fully and reopen it while online.
 
+## Interactive features
+
+- **Call a home run.** Under the meter, tap **Call a home run** before the at-bat ends. A hit pays `1 ÷ chance` points (a 4% long shot is +25), a miss costs 1. You can undo a call until the at-bat is decided. A pop-up tells you how it turned out, and the history list marks the at-bats you called.
+- **My calls** (`#/calls`, or the 📊 button): points, hit rate, best streak, best call, and **your hits vs the hits the model expected**, so you can see whether you're beating the odds. Demo calls can be hidden, and everything can be reset. Saved on the device only (no accounts).
+- **Tap a "Why" line** for a plain-English explanation of that factor.
+- **Try another count**: a grid showing the chance at every count for the current batter and pitcher; tap one for a what-if.
+- **Tap a history row** to read the play-by-play.
+- **Settings** (home screen): choose the spike threshold (1.5x to 4x) and turn vibration on or off.
+
+The chance on a call is the number on the meter when you tapped. In Demo mode each at-bat lasts only 4 seconds, so tap **Pause** first to take your time.
+
 ## How it works
 
 ```
 index.html, styles.css, manifest.webmanifest, sw.js   the app shell + install/offline support
 src/
   config.js      <- settings you'll edit: SPIKE_MULTIPLE, POLL_MS, DEMO_STEP_MS
+  calls.js       call-a-homer scoring, storage and stats (unit tested)
+  settings.js    saved user preferences
   model.js       the home-run math (pure function, unit tested, commented step by step)
   gamestate.js   turns MLB's giant feed JSON into one small "game state" object
   sources.js     liveSource (polls MLB) and demoSource (replays a saved game)
   api.js         all network calls
-  ui/            home.js (Today's Games), game.js (game screen), why.js, diamond.js
+  ui/            home.js (Today's Games), game.js (game screen), calls.js (My calls), why.js, diamond.js
 public/
   data/rates.json         precomputed rates (made by scripts/build_rates.py)
   data/demo_game.json     saved playoff game for Demo mode
   data/team-colors.json   team ID -> color (edit freely)
 scripts/         build_rates.py, build_demo.py, make_icons.py, serve.js
-tests/           model.test.js, gamestate.test.js
+tests/           model.test.js, gamestate.test.js, calls.test.js
 ```
 
 The app never calls pybaseball. It only reads `rates.json`.
@@ -112,7 +125,7 @@ With 0 PA in a split you get exactly the prior (the "fall back to overall" rule)
 
 **App**
 
-11. **Spikes are rare by design.** 2x the league average is about 6%, which only elite hitters in hitter-friendly spots reach. In the demo game it happens in 4 of 150 screens (Alvarez, Murakami). To see it more, lower `SPIKE_MULTIPLE` in `src/config.js` (e.g. 1.5).
+11. **Spikes are rare by design.** 2x the league average is about 6%, which only elite hitters in hitter-friendly spots reach. In the demo game it happens in 4 of 150 screens (Alvarez, Murakami). To see it more, lower the threshold in Settings (or `SPIKE_MULTIPLE` in `src/config.js`).
 12. **Team colors** in `team-colors.json` are my best recall of each team's primary color, not checked against an official source. Several are dark navy; text color is chosen automatically for contrast. Edit freely.
 13. **Batter stat line** (AVG/HR/OPS) comes from the MLB API's regular-season stats, because during the playoffs the feed's own "season stats" are playoff-only and tiny.
 14. **Phone data use:** each poll downloads the whole game feed, about 130 KB compressed. At one poll every 7 seconds that's roughly 65 MB per hour. Cutting this (the API's `fields` filter or diff endpoint) is a good next step.

@@ -148,3 +148,80 @@ button:active { background: var(--card-edge); }
   .meter-number { font-size: 68px; }
   .team-score { font-size: 32px; }
 }
+
+/* ---------- Call a homer ---------- */
+.header-right { display: flex; align-items: center; gap: 10px; }
+.calls-link { font-size: 13px; font-weight: 700; text-decoration: none; }
+.call-box { border-color: var(--accent); }
+.call-button {
+  width: 100%; min-height: 56px; background: var(--accent); color: #1a1405; border: 0;
+  border-radius: 12px; font-size: 18px; font-weight: 800; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.call-button:active { background: #e6b83a; }
+.call-button small { font-size: 12px; font-weight: 600; opacity: 0.85; }
+.call-made { margin-bottom: 10px; }
+button.ghost { background: transparent; border: 1px solid var(--card-edge); color: var(--muted); width: 100%; }
+button.danger { color: #ff8a93; border-color: #6b2b32; margin-top: 12px; }
+
+.toast {
+  position: fixed; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom)); max-width: 496px; margin: 0 auto;
+  padding: 14px 16px; border-radius: 12px; font-weight: 700; z-index: 10; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  animation: slide-up 0.25s ease-out;
+}
+.toast.win { background: #16642f; color: #fff; border: 2px solid #5ee38a; }
+.toast.lose { background: var(--card); color: var(--text); border: 1px solid var(--card-edge); }
+@keyframes slide-up { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* ---------- Why rows are buttons now ---------- */
+.why-item { border-top: 1px solid var(--card-edge); }
+.why-row {
+  width: 100%; text-align: left; background: transparent; border: 0; border-radius: 0; min-height: 44px;
+  display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; padding: 6px 0; font-weight: 400; font-size: 16px; color: var(--text);
+}
+.why-item .why-row { border-top: 0; }
+.why-row.flat { color: var(--muted); }
+.why-tip { margin: 0 0 10px 28px; font-size: 14px; color: var(--muted); }
+h2.spaced { margin-top: 18px; }
+
+/* ---------- Count what-if grid ---------- */
+.count-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.count-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; min-height: 52px; font-weight: 500; font-size: 13px; color: var(--muted); }
+.count-cell b { font-size: 16px; color: var(--text); }
+.count-cell.now { outline: 2px solid var(--accent); }
+.count-cell.picked { background: var(--card-edge); }
+.what-if { margin: 4px 0 10px; }
+
+/* ---------- History rows are tappable ---------- */
+.hist-row { cursor: pointer; }
+.hist-row > .hist-call, .hist-row > .hist-desc { grid-column: 1 / -1; margin: 0; font-size: 13px; }
+.hist-call.hit { color: #5ee38a; font-weight: 700; }
+.hist-call.miss { color: var(--muted); }
+.hist-desc { color: var(--muted); }
+
+/* ---------- Home: calls button + settings ---------- */
+.calls-button {
+  display: block; text-decoration: none; background: var(--card); color: var(--text); border: 1px solid var(--accent);
+  font-weight: 800; padding: 14px; border-radius: var(--radius); margin-bottom: 14px;
+}
+.calls-button small { display: block; font-weight: 500; color: var(--muted); }
+.settings summary { cursor: pointer; font-weight: 700; min-height: 24px; }
+.setting { display: block; margin-top: 12px; font-size: 14px; }
+select { display: block; margin-top: 6px; width: 100%; min-height: 44px; font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--card-edge); border-radius: 8px; padding: 0 8px; }
+.check { display: flex; align-items: center; gap: 8px; }
+.check input { width: 20px; height: 20px; }
+
+/* ---------- My calls screen ---------- */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tile { background: var(--bg); border-radius: 10px; padding: 10px 4px; text-align: center; }
+.tile b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.verdict { margin: 14px 0 6px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.row-between h2 { margin: 0; }
+.call-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 10px 10px 12px; margin-top: 8px; border-radius: 10px; background: var(--bg); border-left: 6px solid var(--card-edge); }
+.call-row.hit { border-left-color: #5ee38a; background: #12301d; }
+.call-outcome { text-align: right; display: flex; flex-direction: column; font-size: 14px; }
+.call-outcome small { color: var(--muted); font-size: 12px; }
+.tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--muted); color: var(--muted); text-transform: uppercase; vertical-align: middle; }
+.call-list { list-style: none; margin: 0; padding: 0; }

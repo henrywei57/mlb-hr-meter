@@ -4,8 +4,10 @@
 // This file only DRAWS. The numbers come from a "source" (src/sources.js) that hands us a
 // game state each time something changes, and from model.js via scoreState().
 
-import { SPIKE_MULTIPLE } from "../config.js";
 import { esc, pct, timeAgo, textOn, teamColor, saveLocal, loadLocal } from "../util.js";
+import { predictHomeRun } from "../model.js";
+import { getSettings } from "../settings.js";
+import { loadCalls, saveCalls, newCall, withCall, withoutPending, resolveCalls, pointsFor } from "../calls.js";
 import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
 
@@ -13,9 +15,9 @@ const handWord = (h) => (h === "L" ? "Left" : "Right");
 
 // Buzz the phone on a spike. iPhone Safari has no navigator.vibrate, so we check first and
 // swallow any error: this must never be able to break the screen.
-function buzz() {
+function buzz(pattern = [200, 100, 200]) {
   try {
-    if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
+    if (getSettings().vibrate && "vibrate" in navigator) navigator.vibrate(pattern);
   } catch { /* not supported or blocked: ignore */ }
 }
 
@@ -23,7 +25,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   root.innerHTML = `
     <header class="top">
       <a class="back" href="#/">‹ Games</a>
-      <span id="chip" class="chip"></span>
+      <span class="header-right"><a class="calls-link" href="#/calls">📊 My calls</a><span id="chip" class="chip"></span></span>
     </header>
     <div id="demo-bar" class="demo-bar" hidden>
       <span>Demo replay</span>
@@ -41,6 +43,8 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
       <div class="meter-ref" id="m-ref"></div>
       <div class="meter-updated" id="m-updated"></div>
     </section>
+    <section id="call-box" class="card call-box" hidden></section>
+    <div id="toast" class="toast" role="status" hidden></div>
     <section id="why" class="card" hidden></section>
     <section id="history" class="card"></section>`;
 
@@ -53,6 +57,11 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   let lastUpdate = 0; // when we last got fresh data
   let offline = false;
   let lastSpikeKey = null;
+  let calls = loadCalls();        // the player's home run calls (saved on the phone)
+  const openWhy = new Set();      // "Why" rows whose tip is expanded
+  const openHist = new Set();     // history rows that are expanded
+  let whatIfCount = null;         // count picked in the "try another count" grid, e.g. "3-1"
+  let toastTimer = null;
 
   // ---------------------------------------------------------------- drawing
   function drawScore(s) {
@@ -117,14 +126,72 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     $("m-est").hidden = !prediction.isEstimate;
 
     // Spike cue: glow/pulse while the chance is high; buzz once when a new spike starts.
-    const spike = prediction.timesLeague >= SPIKE_MULTIPLE;
+    const spike = prediction.timesLeague >= getSettings().spikeMultiple;
     meterEl.classList.toggle("spike", spike);
     const key = spike ? `${s.current.batter.id}-${s.balls}-${s.strikes}` : null;
     if (key && key !== lastSpikeKey) buzz();
     lastSpikeKey = key;
 
     $("why").hidden = false;
-    $("why").innerHTML = whyHtml(prediction, s.current.situation);
+    $("why").innerHTML = whyHtml(prediction, s.current.situation, openWhy) + whatIfHtml(s);
+  }
+
+  // "Try another count": what the chance would be at each count, same batter and pitcher.
+  function whatIfHtml(s) {
+    const sit = s.current.situation;
+    const cells = [];
+    for (let balls = 0; balls <= 3; balls++) {
+      for (let strikes = 0; strikes <= 2; strikes++) {
+        const p = predictHomeRun(rates, { ...sit, balls, strikes });
+        const key = `${balls}-${strikes}`;
+        const isNow = balls === sit.balls && strikes === sit.strikes;
+        cells.push(`<button type="button" class="count-cell ${isNow ? "now" : ""} ${whatIfCount === key ? "picked" : ""}" data-count="${key}"
+          aria-label="${key} count, ${pct(p.probability)}">${key}<b>${pct(p.probability)}</b></button>`);
+      }
+    }
+    let preview = `<p class="hint">Tap a count to see what it would do to the chance.</p>`;
+    if (whatIfCount) {
+      const [b, st] = whatIfCount.split("-").map(Number);
+      const p = predictHomeRun(rates, { ...sit, balls: b, strikes: st });
+      preview = `<p class="what-if">At <b>${whatIfCount}</b> this at-bat would be <b>${pct(p.probability)}</b> (${p.timesLeague.toFixed(1)}x the league average).</p>`;
+    }
+    return `<h2 class="spaced">Try another count</h2>${preview}<div class="count-grid">${cells.join("")}</div>
+      <p class="note">Rows are balls (0-3), columns are strikes (0-2). Yellow outline = the current count.</p>`;
+  }
+
+  // ---------------------------------------------------------------- call a homer
+  const currentCallId = (s) => `${gamePk}-${s.current.atBatIndex}`;
+
+  function drawCallBox(s) {
+    const box = $("call-box");
+    if (!s.current || !s.isLive) { box.hidden = true; return; }
+    box.hidden = false;
+    const mine = calls.find((c) => c.id === currentCallId(s) && c.status === "pending");
+    const payout = Math.round(1 / Math.max(s.current.prediction.probability, 0.01));
+    if (mine) {
+      box.innerHTML = `
+        <div class="call-made">✅ You called a <b>home run</b> for ${esc(s.current.batter.name)}.
+          <span class="muted">Locked in at ${pct(mine.chance)} chance, worth +${Math.round(1 / Math.max(mine.chance, 0.01))} pts.</span></div>
+        <button type="button" id="call-undo" class="ghost">Undo call</button>`;
+    } else {
+      box.innerHTML = `
+        <button type="button" id="call-btn" class="call-button">💥 Call a home run<small>+${payout} pts if ${esc(s.current.batter.name)} homers, −1 if not</small></button>
+        ${source.isDemo ? `<p class="note">Tip: pause the demo to take your time.</p>` : ""}`;
+    }
+  }
+
+  function showToast(settled) {
+    const call = settled[settled.length - 1];
+    const points = pointsFor(call);
+    const toast = $("toast");
+    toast.className = "toast " + (call.status === "hit" ? "win" : "lose");
+    toast.textContent = call.status === "hit"
+      ? `🎉 You called it! ${call.batterName} homered. +${points} pts`
+      : `${call.batterName}: ${call.resultText}. Your call missed (${points} pt).`;
+    toast.hidden = false;
+    if (call.status === "hit") buzz([100, 60, 100, 60, 300]);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.hidden = true; }, 5000);
   }
 
   function drawHistory(s) {
@@ -135,17 +202,21 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     }
     const rows = [...s.history].reverse().map((row) => {
       const color = teamColor(colors, row.isTop ? s.away.id : s.home.id);
+      const open = openHist.has(row.id);
+      const mine = calls.find((c) => c.id === `${gamePk}-${row.id}` && c.status !== "pending");
       return `
-        <li class="hist-row ${row.isHR ? "hr" : ""}" style="--team:${color}">
+        <li class="hist-row ${row.isHR ? "hr" : ""} ${open ? "open" : ""}" style="--team:${color}" data-hist="${row.id}" tabindex="0" role="button" aria-expanded="${open}">
           <div class="hist-main">
             <div class="hist-batter">${esc(row.batterName)}</div>
             <div class="hist-sub">${esc(row.inning)} · vs ${esc(row.pitcherName)}</div>
           </div>
           <div class="hist-result ${row.isHR ? "hr" : ""}">${row.isHR ? "💥 HOME RUN" : esc(row.result)}</div>
           <div class="hist-pred" title="Predicted chance before the first pitch">${pct(row.prediction.probability)}<small>chance</small></div>
+          ${mine ? `<span class="hist-call ${mine.status}">${mine.status === "hit" ? "✅ you called it" : "❌ your call missed"}</span>` : ""}
+          ${open ? `<p class="hist-desc">${esc(row.description)}</p>` : ""}
         </li>`;
     }).join("");
-    el.innerHTML = `<h2>At-bat history</h2><p class="hint">The chance shown is the prediction before the first pitch.</p><ul class="hist-list">${rows}</ul>`;
+    el.innerHTML = `<h2>At-bat history</h2><p class="hint">The chance shown is the prediction before the first pitch. Tap a row for the play-by-play.</p><ul class="hist-list">${rows}</ul>`;
   }
 
   function draw() {
@@ -153,6 +224,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     drawScore(state);
     drawMatchup(state);
     drawMeter(state);
+    drawCallBox(state);
     drawHistory(state);
     tick();
   }
@@ -174,6 +246,14 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
       lastUpdate = time;
       offline = false;
       if (!source.isDemo) saveLocal(`hr:game:${gamePk}`, { state: newState, time });
+
+      // Did any at-bat just finish that the player made a call on?
+      const resolved = resolveCalls(calls, gamePk, newState.history);
+      if (resolved.settled.length) {
+        calls = resolved.calls;
+        saveCalls(calls);
+        showToast(resolved.settled);
+      }
       draw();
     },
     onError() {
@@ -201,6 +281,34 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     $("restart").addEventListener("click", () => { source.restart(); pause.textContent = "Pause"; lastSpikeKey = null; });
   }
 
+  // ---------------------------------------------------------------- taps (one listener for the whole screen)
+  root.addEventListener("click", (event) => {
+    const hit = (selector) => event.target.closest(selector);
+    if (hit("#call-btn") && state?.current) {
+      const call = newCall({ gamePk, current: state.current, chance: state.current.prediction.probability, isDemo: source.isDemo });
+      calls = withCall(calls, call);
+      saveCalls(calls);
+      buzz([60]);
+      drawCallBox(state);
+    } else if (hit("#call-undo") && state?.current) {
+      calls = withoutPending(calls, currentCallId(state));
+      saveCalls(calls);
+      drawCallBox(state);
+    } else if (hit("[data-why]")) {
+      const key = hit("[data-why]").dataset.why;
+      openWhy.has(key) ? openWhy.delete(key) : openWhy.add(key);
+      drawMeter(state);
+    } else if (hit("[data-count]")) {
+      const key = hit("[data-count]").dataset.count;
+      whatIfCount = whatIfCount === key ? null : key;
+      drawMeter(state);
+    } else if (hit("[data-hist]")) {
+      const id = Number(hit("[data-hist]").dataset.hist);
+      openHist.has(id) ? openHist.delete(id) : openHist.add(id);
+      drawHistory(state);
+    }
+  });
+
   source.start();
-  return () => { clearInterval(clock); source.stop(); }; // called when leaving this screen
+  return () => { clearInterval(clock); clearTimeout(toastTimer); source.stop(); }; // called when leaving this screen
 }

@@ -10,13 +10,16 @@
 //   current: { situation, batter: {id,name,side}, pitcher: {id,name,hand} } | null,
 //   history: [ { id, inning, teamId, batterName, result, isHR, situation } ],
 // }
-// scoreState() then attaches `.prediction` (from model.js) to `current` and to every history row.
+// scoreState() then attaches predictions (from model.js) to `current` and to every history row:
+//   .prediction = home run chance, .predictions = { hr, k, tb }, .extraBase = chance of 2+ bases
 
-import { predictHomeRun } from "./model.js";
+import { predictStat, extraBaseChance } from "./model.js";
 
 // Events that are NOT the end of a plate appearance (a steal, a pickoff...). Same idea as
 // NOT_A_PLATE_APPEARANCE in scripts/build_rates.py.
 const NOT_A_PA = ["caught_stealing", "pickoff", "stolen_base", "wild_pitch", "passed_ball", "balk", "other_advance", "runner_"];
+
+const BASES_BY_EVENT = { single: 1, double: 2, triple: 3, home_run: 4 };
 
 export function isPlateAppearance(play) {
   const type = play.result?.eventType || "";
@@ -54,6 +57,8 @@ function historyRow(play, venueId) {
     result: play.result.event,
     description: play.result.description,
     isHR: play.result.eventType === "home_run",
+    isK: (play.result.eventType || "").startsWith("strikeout"),
+    bases: BASES_BY_EVENT[play.result.eventType] || 0, // total bases the batter got
     // The history shows the chance BEFORE the first pitch, so every row is judged at 0-0.
     situation: {
       batterId: String(play.matchup.batter.id),
@@ -197,7 +202,18 @@ export function demoStateAt(feed, frames, step, phase = 1) {
 }
 
 // ------------------------------------------------------------------ predictions
-// Attach a home-run prediction to the current at-bat and to every row of history.
+function attachPredictions(target, rates, situation) {
+  const predictions = {
+    hr: predictStat(rates, situation, "hr"),
+    k: predictStat(rates, situation, "k"),
+    tb: predictStat(rates, situation, "tb"),
+  };
+  target.predictions = predictions;
+  target.prediction = predictions.hr; // the headline number
+  target.extraBase = extraBaseChance(rates, predictions.tb);
+}
+
+// Attach predictions (home run, strikeout, total bases) to the current at-bat and to every row of history.
 export function scoreState(state, rates) {
   if (state.current) {
     state.current.situation = {
@@ -209,8 +225,8 @@ export function scoreState(state, rates) {
       balls: state.balls,
       strikes: state.strikes,
     };
-    state.current.prediction = predictHomeRun(rates, state.current.situation);
+    attachPredictions(state.current, rates, state.current.situation);
   }
-  for (const row of state.history) row.prediction = predictHomeRun(rates, row.situation);
+  for (const row of state.history) attachPredictions(row, rates, row.situation);
   return state;
 }

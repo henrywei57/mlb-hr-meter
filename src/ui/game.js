@@ -7,7 +7,7 @@
 import { esc, pct, timeAgo, textOn, teamColor, saveLocal, loadLocal } from "../util.js";
 import { predictHomeRun } from "../model.js";
 import { getSettings } from "../settings.js";
-import { loadCalls, saveCalls, newCall, withCall, withoutPending, resolveCalls, pointsFor } from "../calls.js";
+import { loadCalls, saveCalls, newCall, withCall, withoutPending, resolveCalls, pointsFor, callId, KINDS } from "../calls.js";
 import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
 
@@ -44,6 +44,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
       <div class="meter-updated" id="m-updated"></div>
     </section>
     <section id="call-box" class="card call-box" hidden></section>
+    <section id="extras" class="extras" hidden></section>
     <div id="toast" class="toast" role="status" hidden></div>
     <section id="why" class="card" hidden></section>
     <section id="history" class="card"></section>`;
@@ -160,34 +161,92 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   }
 
   // ---------------------------------------------------------------- call a homer
-  const currentCallId = (s) => `${gamePk}-${s.current.atBatIndex}`;
+  const currentCallId = (s, kind) => callId(gamePk, s.current.atBatIndex, kind);
+  const pendingCall = (s, kind) => calls.find((c) => c.id === currentCallId(s, kind) && c.status === "pending");
+
+  // The chance we use to pay out each kind of call.
+  function chanceFor(kind, current) {
+    if (kind === "hr") return current.prediction.value;
+    if (kind === "k") return current.predictions.k.value;
+    return current.extraBase; // "xbh" (null if the data file has no extra-base rate)
+  }
+  const payoutFor = (chance) => Math.round(1 / Math.max(chance, 0.01));
+
+  // Tap handler for every Call button: make the call, or undo it if it's already made.
+  function toggleCall(kind) {
+    if (!state?.current) return;
+    const existing = pendingCall(state, kind);
+    if (existing) {
+      calls = withoutPending(calls, existing.id);
+    } else {
+      const chance = chanceFor(kind, state.current);
+      if (chance == null) return;
+      calls = withCall(calls, newCall({ gamePk, current: state.current, chance, isDemo: source.isDemo, kind }));
+      buzz([60]);
+    }
+    saveCalls(calls);
+    drawCallBox(state);
+    drawExtras(state);
+  }
+
+  // The two smaller tiles under the home run meter: expected total bases and strikeout chance.
+  function drawExtras(s) {
+    const box = $("extras");
+    if (!s.current?.predictions || !s.isLive) { box.hidden = true; return; } // (older saved copies have no extras)
+    box.hidden = false;
+    const { tb, k } = s.current.predictions;
+    const callButton = (kind, text) => {
+      const chance = chanceFor(kind, s.current);
+      if (chance == null) return "";
+      return pendingCall(s, kind)
+        ? `<button type="button" class="call-small made" data-call="${kind}">✅ Called · tap to undo</button>`
+        : `<button type="button" class="call-small" data-call="${kind}">${text}<small>+${payoutFor(chance)} pts if right</small></button>`;
+    };
+    const xbh = s.current.extraBase;
+    box.innerHTML = `
+      <div class="extra-tile">
+        <div class="extra-label">Expected total bases</div>
+        <div class="extra-number">${tb.value.toFixed(2)}</div>
+        <div class="extra-ref">League avg ${tb.leagueRate.toFixed(2)}${xbh != null ? ` · 2+ bases about ${pct(xbh)}` : ""}</div>
+        ${callButton("xbh", "Call 2+ bases")}
+      </div>
+      <div class="extra-tile">
+        <div class="extra-label">Strikeout chance</div>
+        <div class="extra-number">${pct(k.value)}</div>
+        <div class="extra-ref">League avg ${pct(k.leagueRate)}</div>
+        ${callButton("k", "Call strikeout")}
+      </div>`;
+  }
 
   function drawCallBox(s) {
     const box = $("call-box");
-    if (!s.current || !s.isLive) { box.hidden = true; return; }
+    if (!s.current || !s.isLive || !s.current.predictions) { box.hidden = true; return; }
     box.hidden = false;
-    const mine = calls.find((c) => c.id === currentCallId(s) && c.status === "pending");
-    const payout = Math.round(1 / Math.max(s.current.prediction.probability, 0.01));
+    const mine = pendingCall(s, "hr");
+    const payout = payoutFor(s.current.prediction.value);
     if (mine) {
       box.innerHTML = `
         <div class="call-made">✅ You called a <b>home run</b> for ${esc(s.current.batter.name)}.
           <span class="muted">Locked in at ${pct(mine.chance)} chance, worth +${Math.round(1 / Math.max(mine.chance, 0.01))} pts.</span></div>
-        <button type="button" id="call-undo" class="ghost">Undo call</button>`;
+        <button type="button" class="ghost" data-call="hr">Undo call</button>`;
     } else {
       box.innerHTML = `
-        <button type="button" id="call-btn" class="call-button">💥 Call a home run<small>+${payout} pts if ${esc(s.current.batter.name)} homers, −1 if not</small></button>
+        <button type="button" class="call-button" data-call="hr">💥 Call a home run<small>+${payout} pts if ${esc(s.current.batter.name)} homers, −1 if not</small></button>
         ${source.isDemo ? `<p class="note">Tip: pause the demo to take your time.</p>` : ""}`;
     }
   }
 
   function showToast(settled) {
-    const call = settled[settled.length - 1];
+    // Several calls can settle at once (e.g. a double settles a strikeout call and a 2+ bases call).
+    // Celebrate a win if there was one; otherwise show the last result.
+    const call = settled.find((c) => c.status === "hit") || settled[settled.length - 1];
     const points = pointsFor(call);
     const toast = $("toast");
     toast.className = "toast " + (call.status === "hit" ? "win" : "lose");
+    const kind = KINDS[call.kind] || KINDS.hr;
     toast.textContent = call.status === "hit"
-      ? `🎉 You called it! ${call.batterName} homered. +${points} pts`
-      : `${call.batterName}: ${call.resultText}. Your call missed (${points} pt).`;
+      ? `🎉 You called it! ${call.batterName} ${kind.verb}. +${points} pts`
+      : `${call.batterName}: ${call.resultText}. Your ${kind.label} call missed (${points} pt).`;
     toast.hidden = false;
     if (call.status === "hit") buzz([100, 60, 100, 60, 300]);
     clearTimeout(toastTimer);
@@ -203,7 +262,8 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     const rows = [...s.history].reverse().map((row) => {
       const color = teamColor(colors, row.isTop ? s.away.id : s.home.id);
       const open = openHist.has(row.id);
-      const mine = calls.find((c) => c.id === `${gamePk}-${row.id}` && c.status !== "pending");
+      const mine = calls.filter((c) => c.gamePk === String(gamePk) && c.atBatIndex === row.id && c.status !== "pending");
+      const p = row.predictions;
       return `
         <li class="hist-row ${row.isHR ? "hr" : ""} ${open ? "open" : ""}" style="--team:${color}" data-hist="${row.id}" tabindex="0" role="button" aria-expanded="${open}">
           <div class="hist-main">
@@ -212,8 +272,8 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
           </div>
           <div class="hist-result ${row.isHR ? "hr" : ""}">${row.isHR ? "💥 HOME RUN" : esc(row.result)}</div>
           <div class="hist-pred" title="Predicted chance before the first pitch">${pct(row.prediction.probability)}<small>chance</small></div>
-          ${mine ? `<span class="hist-call ${mine.status}">${mine.status === "hit" ? "✅ you called it" : "❌ your call missed"}</span>` : ""}
-          ${open ? `<p class="hist-desc">${esc(row.description)}</p>` : ""}
+          ${mine.map((c) => `<span class="hist-call ${c.status}">${c.status === "hit" ? "✅ called" : "❌ missed"} ${esc(KINDS[c.kind].short)}</span>`).join("")}
+          ${open ? `<p class="hist-desc">${esc(row.description)}${p ? `<br>Before the first pitch: HR ${pct(p.hr.value)} · strikeout ${pct(p.k.value)} · ${p.tb.value.toFixed(2)} expected bases` : ""}</p>` : ""}
         </li>`;
     }).join("");
     el.innerHTML = `<h2>At-bat history</h2><p class="hint">The chance shown is the prediction before the first pitch. Tap a row for the play-by-play.</p><ul class="hist-list">${rows}</ul>`;
@@ -225,6 +285,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     drawMatchup(state);
     drawMeter(state);
     drawCallBox(state);
+    drawExtras(state);
     drawHistory(state);
     tick();
   }
@@ -284,16 +345,8 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   // ---------------------------------------------------------------- taps (one listener for the whole screen)
   root.addEventListener("click", (event) => {
     const hit = (selector) => event.target.closest(selector);
-    if (hit("#call-btn") && state?.current) {
-      const call = newCall({ gamePk, current: state.current, chance: state.current.prediction.probability, isDemo: source.isDemo });
-      calls = withCall(calls, call);
-      saveCalls(calls);
-      buzz([60]);
-      drawCallBox(state);
-    } else if (hit("#call-undo") && state?.current) {
-      calls = withoutPending(calls, currentCallId(state));
-      saveCalls(calls);
-      drawCallBox(state);
+    if (hit("[data-call]")) {
+      toggleCall(hit("[data-call]").dataset.call);
     } else if (hit("[data-why]")) {
       const key = hit("[data-why]").dataset.why;
       openWhy.has(key) ? openWhy.delete(key) : openWhy.add(key);

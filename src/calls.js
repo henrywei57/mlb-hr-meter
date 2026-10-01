@@ -1,8 +1,13 @@
-// "Call a homer": the player predicts a home run before the at-bat ends, and we keep score.
+// "Make a call": the player predicts something about an at-bat before it ends, and we keep score.
 // This file has no browser UI code (just localStorage), so the scoring is easy to read and test.
 //
+// Three kinds of call:
+//   hr  - the batter hits a home run
+//   k   - the batter strikes out
+//   xbh - the batter gets an extra-base hit (double, triple or home run: 2+ total bases)
+//
 // A call looks like:
-// { id, gamePk, atBatIndex, batterId, batterName, pitcherName, chance, madeAt, isDemo,
+// { id, kind, gamePk, atBatIndex, batterId, batterName, pitcherName, chance, madeAt, isDemo,
 //   status: "pending" | "hit" | "miss", resultText }
 //
 // Scoring: a hit pays round(1 / chance) points, a miss costs 1. So calling a 3% long shot that
@@ -12,12 +17,23 @@ import { loadLocal, saveLocal } from "./util.js";
 
 const STORAGE_KEY = "hr:calls";
 
-export const loadCalls = () => loadLocal(STORAGE_KEY) || [];
+// Everything that differs between the kinds of call lives in this one table.
+export const KINDS = {
+  hr:  { label: "home run", short: "HR", won: (row) => row.isHR, verb: "homered" },
+  k:   { label: "strikeout", short: "K", won: (row) => !!row.isK, verb: "struck out" },
+  xbh: { label: "extra-base hit", short: "2+ bases", won: (row) => (row.bases || 0) >= 2, verb: "got an extra-base hit" },
+};
+
+export const loadCalls = () => (loadLocal(STORAGE_KEY) || []).map((c) => ({ kind: "hr", ...c })); // old saves were all home run calls
 export const saveCalls = (calls) => saveLocal(STORAGE_KEY, calls);
 
-export function newCall({ gamePk, current, chance, isDemo }) {
+// A home run call keeps the original id format so calls saved by earlier versions still match.
+export const callId = (gamePk, atBatIndex, kind) => (kind === "hr" ? `${gamePk}-${atBatIndex}` : `${gamePk}-${atBatIndex}-${kind}`);
+
+export function newCall({ gamePk, current, chance, isDemo, kind = "hr" }) {
   return {
-    id: `${gamePk}-${current.atBatIndex}`,
+    id: callId(gamePk, current.atBatIndex, kind),
+    kind,
     gamePk: String(gamePk),
     atBatIndex: current.atBatIndex,
     batterId: current.batter.id,
@@ -38,7 +54,7 @@ export function pointsFor(call) {
   return 0;
 }
 
-// Add a call (replacing any earlier call on the same at-bat).
+// Add a call (replacing any earlier call with the same id).
 export const withCall = (calls, call) => [...calls.filter((c) => c.id !== call.id), call];
 
 // Take back a call that hasn't been decided yet.
@@ -53,7 +69,7 @@ export function resolveCalls(calls, gamePk, history) {
     if (call.status !== "pending" || call.gamePk !== String(gamePk)) return call;
     const row = history.find((h) => h.id >= call.atBatIndex && h.situation.batterId === call.batterId);
     if (!row) return call;
-    const done = { ...call, status: row.isHR ? "hit" : "miss", resultText: row.result };
+    const done = { ...call, status: (KINDS[call.kind] || KINDS.hr).won(row) ? "hit" : "miss", resultText: row.result };
     settled.push(done);
     return done;
   });

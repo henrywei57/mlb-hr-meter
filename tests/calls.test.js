@@ -62,3 +62,29 @@ test("stats with no calls are all zero and don't divide by zero", () => {
   assert.equal(s.hitRate, 0);
   assert.equal(s.bestCall, null);
 });
+
+// ---- strikeout and extra-base calls ----
+import { newCall, callId, KINDS } from "../src/calls.js";
+
+test("strikeout calls win on a strikeout; extra-base calls win on 2+ total bases", () => {
+  const k = call({ kind: "k" });
+  assert.equal(resolveCalls([k], "1", [{ ...row(5, "10", false), isK: true }]).calls[0].status, "hit");
+  assert.equal(resolveCalls([k], "1", [row(5, "10", false, "Single")]).calls[0].status, "miss");
+  const x = call({ kind: "xbh" });
+  assert.equal(resolveCalls([x], "1", [{ ...row(5, "10", false, "Double"), bases: 2 }]).calls[0].status, "hit");
+  assert.equal(resolveCalls([x], "1", [{ ...row(5, "10", true, "Home Run"), isHR: true, bases: 4 }]).calls[0].status, "hit");
+  assert.equal(resolveCalls([x], "1", [{ ...row(5, "10", false, "Single"), bases: 1 }]).calls[0].status, "miss");
+});
+
+test("different kinds of call on the same at-bat don't replace each other", () => {
+  const current = { atBatIndex: 5, batter: { id: "10", name: "A" }, pitcher: { name: "P" } };
+  const hr = newCall({ gamePk: 1, current, chance: 0.05, kind: "hr" });
+  const k = newCall({ gamePk: 1, current, chance: 0.2, kind: "k" });
+  assert.equal(hr.id, "1-5"); // original id format, so older saved calls still match
+  assert.equal(k.id, callId(1, 5, "k"));
+  assert.equal(withCall([hr], k).length, 2);
+});
+
+test("every kind has a label", () => {
+  for (const kind of Object.values(KINDS)) assert.ok(kind.label && kind.short && kind.verb);
+});

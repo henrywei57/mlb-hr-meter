@@ -41,8 +41,9 @@ To pick up a new version, close the app fully and reopen it while online.
 
 ## Interactive features
 
-- **Call a home run.** Under the meter, tap **Call a home run** before the at-bat ends. A hit pays `1 ÷ chance` points (a 4% long shot is +25), a miss costs 1. You can undo a call until the at-bat is decided. A pop-up tells you how it turned out, and the history list marks the at-bats you called.
-- **My calls** (`#/calls`, or the 📊 button): points, hit rate, best streak, best call, and **your hits vs the hits the model expected**, so you can see whether you're beating the odds. Demo calls can be hidden, and everything can be reset. Saved on the device only (no accounts).
+- **Two smaller meters** under the home run meter: **Expected total bases** (single = 1, double = 2, triple = 3, home run = 4) and **Strikeout chance**. They use the same recipe as the home run number: league average, then batter, pitcher, lefty/righty, count and park.
+- **Make a call** on any of three things before the at-bat ends: a **home run**, a **strikeout**, or **2+ bases** (an extra-base hit). A hit pays `1 ÷ chance` points (a 4% long shot is +25), a miss costs 1. Tap a Call button again to undo it. A pop-up tells you how it turned out, and the history list marks the at-bats you called.
+- **My calls** (`#/calls`, or the 📊 button): points, hit rate, best streak, best call, your hits vs the hits the model expected, and a breakdown by type of call. Demo calls can be hidden, and everything can be reset. Saved on the device only (no accounts).
 - **Tap a "Why" line** for a plain-English explanation of that factor.
 - **Try another count**: a grid showing the chance at every count for the current batter and pitcher; tap one for a what-if.
 - **Tap a history row** to read the play-by-play.
@@ -56,7 +57,7 @@ The chance on a call is the number on the meter when you tapped. In Demo mode ea
 index.html, styles.css, manifest.webmanifest, sw.js   the app shell + install/offline support
 src/
   config.js      <- settings you'll edit: SPIKE_MULTIPLE, POLL_MS, DEMO_STEP_MS
-  calls.js       call-a-homer scoring, storage and stats (unit tested)
+  calls.js       call scoring (HR / strikeout / 2+ bases), storage and stats (unit tested)
   settings.js    saved user preferences
   model.js       the home-run math (pure function, unit tested, commented step by step)
   gamestate.js   turns MLB's giant feed JSON into one small "game state" object
@@ -71,7 +72,7 @@ scripts/         build_rates.py, build_demo.py, make_icons.py, serve.js
 tests/           model.test.js, gamestate.test.js, calls.test.js
 ```
 
-The app never calls pybaseball. It only reads `rates.json`.
+The app never calls pybaseball. It only reads `rates.json`. (It holds home run, strikeout and total-bases rates for every player, which is why it's about 670 KB.)
 
 ### The model (`src/model.js`)
 
@@ -116,6 +117,15 @@ With 0 PA in a split you get exactly the prior (the "fall back to overall" rule)
 5. **Park factors** are Baseball Savant's 3-year rolling HR index (2024-2026), scraped from the JSON embedded in their page, so the page layout could change. **The Athletics' park (venue 2529) is missing**, so it uses 100 (average). Park factors aren't split by batter handedness.
 6. **Players under 25 PA** (2025-26 combined) are left out; the app then uses league average and shows an **"estimate"** label. This also happens for rookies.
 7. **Switch hitters** are handled per plate appearance (they bat from the side opposite the pitcher's arm).
+
+**Strikeouts, total bases and 2+ bases**
+
+- **Total bases** are an expected *value* per plate appearance (about 0.36 league-wide), not a probability. The log5 step is designed for probabilities, so using it here is an approximation, though it behaves the same way (an average pitcher returns the batter's own rate). Walks and hit-by-pitches count as 0 bases. The "Expected total bases" number is only for that one plate appearance, not bases advanced on the bases afterwards.
+- **"2+ bases" chance is an approximation.** I don't model singles, doubles and triples separately. It's the league extra-base-hit rate (7.6% of plate appearances) scaled by how many total bases the matchup is expected to produce compared with average, capped at 90%. This is also what the Call 2+ bases payout uses.
+- **Park factors for total bases** are my own blend of Savant's 1B, 2B, 3B and HR indexes, weighted by how many bases each kind of hit contributes. Savant doesn't publish a total-bases index. Strikeouts use Savant's strikeout index.
+- **Shrinkage strength differs per stat** (my judgment, in the `STATS` table at the top of `build_rates.py`): strikeouts settle quickly so need less pulling toward average (60 / 100 / 200 pretend PA), home runs need the most (170 / 700 / 300), total bases sit in between (250 / 500 / 400).
+- **The "Why this number" list only explains the home run number.** The two smaller meters don't have their own breakdown yet.
+- Quick check on the demo game (75 plate appearances): expected total bases 26.2 vs 26 actual; expected strikeouts 20 vs 28 actual (one game, so mostly noise).
 
 **Model**
 

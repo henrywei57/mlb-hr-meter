@@ -112,3 +112,51 @@ test("probability is capped so it can never be absurd", () => {
   const wild = { ...rates, park_hr_factors: { 1: 100000 } };
   assert.ok(predictHomeRun(wild, base).probability <= 0.6);
 });
+
+// ---- strikeouts and total bases use the same recipe with their own rates ----
+import { predictStat, extraBaseChance } from "../src/model.js";
+
+const multi = {
+  league: { hr_per_pa: 0.03, k_per_pa: 0.22, tb_per_pa: 0.36, xbh_per_pa: 0.08 },
+  count_multipliers: { "0-0": { multiplier: 1 } },
+  k_count_multipliers: { "0-0": { multiplier: 1 }, "0-2": { multiplier: 2 } },
+  tb_count_multipliers: { "0-0": { multiplier: 1 }, "3-1": { multiplier: 0.5 } },
+  park_hr_factors: { 1: 100 }, park_k_factors: { 1: 110 }, park_tb_factors: { 1: 100 },
+  batters: {
+    whiffer: { rate: 0.03, k: { rate: 0.33, vsL: { rate: 0.33 }, vsR: { rate: 0.33 } }, tb: { rate: 0.36, vsL: { rate: 0.36 }, vsR: { rate: 0.36 } } },
+  },
+  pitchers: {
+    avg: { rate: 0.03, k: { rate: 0.22, vsL: { rate: 0.22 }, vsR: { rate: 0.22 } }, tb: { rate: 0.36, vsL: { rate: 0.36 }, vsR: { rate: 0.36 } } },
+  },
+};
+const sit = { batterId: "whiffer", pitcherId: "avg", batSide: "R", pitchHand: "R", venueId: 1, balls: 0, strikes: 0 };
+
+test("strikeout chance: a high-strikeout batter, a K-friendly park, and a 0-2 count all push it up", () => {
+  const r = predictStat(multi, sit, "k");
+  close(r.factors.batter, 1.5);
+  close(r.factors.park, 1.1);
+  assert.ok(r.value > 0.33 && r.value < 0.95);
+  const twoStrikes = predictStat(multi, { ...sit, strikes: 2 }, "k");
+  close(twoStrikes.value / r.value, 2); // count multiplier is applied directly
+});
+
+test("total bases: an average matchup gives the league average, and the count multiplier applies", () => {
+  const avg = predictStat(multi, { ...sit, batterId: "nobody" }, "tb");
+  close(avg.value, 0.36);
+  assert.equal(avg.isEstimate, true);
+  close(predictStat(multi, { ...sit, balls: 3, strikes: 1 }, "tb").value, 0.18);
+});
+
+test("every stat's factors multiply back to its value", () => {
+  for (const stat of ["hr", "k", "tb"]) {
+    const r = predictStat(multi, { ...sit, strikes: 2 }, stat);
+    const f = r.factors;
+    close(r.leagueRate * f.batter * f.pitcher * f.platoon * f.count * f.park, r.value, 1e-9);
+  }
+});
+
+test("extra-base-hit chance scales the league rate by expected total bases, and is capped", () => {
+  close(extraBaseChance(multi, { timesLeague: 1.5 }), 0.12);
+  assert.equal(extraBaseChance(multi, { timesLeague: 100 }), 0.9);
+  assert.equal(extraBaseChance({ league: {} }, { timesLeague: 1 }), null);
+});

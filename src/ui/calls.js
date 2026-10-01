@@ -41,6 +41,7 @@ export function showCalls(root) {
 
     root.innerHTML = `
       <header class="top"><a class="back" href="#/">‹ Games</a><h1>My calls</h1><span></span></header>
+      <div class="calls-grid"><div class="col">
       <section class="card">
         <div class="tiles">
           ${tile(s.points, "Points")}
@@ -60,6 +61,7 @@ export function showCalls(root) {
           <tbody>${byKind}</tbody>
         </table>
       </section>
+      </div><div class="col">
       <section class="card">
         <div class="row-between">
           <h2>All calls</h2>
@@ -67,7 +69,8 @@ export function showCalls(root) {
         </div>
         ${rows ? `<ul class="call-list">${rows}</ul>` : `<p class="muted">Nothing yet.</p>`}
         ${all.length ? `<button type="button" id="reset" class="ghost danger">Reset all my calls</button>` : ""}
-      </section>`;
+      </section>
+      </div></div>`;
   }
 
   root.addEventListener("click", (event) => {

@@ -35,6 +35,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
       <button id="restart" type="button">Restart</button>
     </div>
     <div id="banner" class="banner" hidden></div>
+    <div class="game-grid"><div class="col-main">
     <section id="score" class="card score"></section>
     <section id="scene" class="card scene" hidden></section>
     <section id="matchup" class="card"></section>
@@ -48,8 +49,11 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     <section id="call-box" class="card call-box" hidden></section>
     <section id="extras" class="extras" hidden></section>
     <div id="toast" class="toast" role="status" hidden></div>
+    <p class="kbd-hint">Keyboard: <kbd>H</kbd> call home run · <kbd>B</kbd> call 2+ bases · <kbd>K</kbd> call strikeout · <kbd>Space</kbd> pause demo</p>
+    </div><div class="col-side">
     <section id="why" class="card" hidden></section>
-    <section id="history" class="card"></section>`;
+    <section id="history" class="card"></section>
+    </div></div>`;
 
   const $ = (id) => root.querySelector("#" + id);
   const meterEl = $("meter");
@@ -386,6 +390,27 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     }
   });
 
+  // Keyboard shortcuts for computers. Ignored while typing in a field or holding Ctrl/Cmd/Alt.
+  function onKey(event) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(event.target.tagName)) return;
+    const key = event.key.toLowerCase();
+    if (key === "h") toggleCall("hr");
+    else if (key === "k") toggleCall("k");
+    else if (key === "b") toggleCall("xbh");
+    else if (key === " " && source.isDemo && event.target === document.body) {
+      event.preventDefault(); // stop the page scrolling
+      $("pause").click();
+    }
+  }
+  document.addEventListener("keydown", onKey);
+
+  // History rows are focusable: Enter or Space opens them, like a tap.
+  root.addEventListener("keydown", (event) => {
+    const row = event.target.closest?.("[data-hist]");
+    if (row && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); row.click(); }
+  });
+
   source.start();
-  return () => { clearInterval(clock); clearTimeout(toastTimer); source.stop(); }; // called when leaving this screen
+  return () => { clearInterval(clock); clearTimeout(toastTimer); document.removeEventListener("keydown", onKey); source.stop(); }; // called when leaving this screen
 }

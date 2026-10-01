@@ -53,8 +53,10 @@ export function showHome(root) {
 
   root.innerHTML = `
     <header class="top"><h1>Today's Games</h1></header>
-    <a class="demo-button" href="#/demo">▶ Demo game <small>replay a real playoff game with 4 home runs</small></a>
-    <a class="calls-button" href="#/calls">📊 My calls <small>${callsSummary()}</small></a>
+    <div class="actions">
+      <a class="demo-button" href="#/demo">▶ Demo game <small>replay a real playoff game with 4 home runs</small></a>
+      <a class="calls-button" href="#/calls">📊 My calls <small>${callsSummary()}</small></a>
+    </div>
     <details class="card settings">
       <summary>⚙ Settings</summary>
       <label class="setting">Glow and buzz when the chance is at least

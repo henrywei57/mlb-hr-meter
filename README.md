@@ -39,6 +39,17 @@ After changing code, push again. If you **add a new file** that should work offl
 
 To pick up a new version, close the app fully and reopen it while online.
 
+## Phone and computer
+
+One layout that adapts to the screen:
+- **Phone (under 640 px):** a single column, big tap targets, safe-area padding for the iPhone notch. Designed for 360 px wide.
+- **Tablet (640 px and up):** the same column, a little wider.
+- **Computer (960 px and up):** a two-column dashboard. The game screen puts the score, scene, meters and calls on the left and the "Why" list, count what-if grid and history on the right. Today's Games becomes a grid of cards, and My calls puts your stats beside the list.
+- **Mouse:** hover highlights and pointer cursors.
+- **Keyboard (computer):** <kbd>H</kbd> call home run, <kbd>B</kbd> call 2+ bases, <kbd>K</kbd> call strikeout, <kbd>Space</kbd> pause or resume the demo. History rows and every button work with Tab and Enter.
+
+The layout rules are the last section of `styles.css`.
+
 ## Interactive features
 
 - **Matchup scene:** a pitcher and batter in team colors that react to the count. In a hitter's count (2-0, 2-1, 3-1) the batter swings loose and the pitcher sweats; in a pitcher's count (0-2, 1-2) the pitcher looks confident and the batter chokes up; a full count makes both tense. A ball is thrown whenever the count changes. Handedness comes straight from the data: from the center-field camera a **right-handed batter stands on the right of the plate and a lefty on the left**, with the bat held away from the plate, and the pitcher's **ball hand is on his throwing side**. The ball, strike and out dots and a caption sit with it. Code: `src/ui/scene.js`.

@@ -122,6 +122,8 @@ With 0 PA in a split you get exactly the prior (the "fall back to overall" rule)
 
 ## Things to double-check (assumptions)
 
+**Headshots.** The player photos are MLB's images, loaded live from `img.mlbstatic.com` (they are not stored in this repo). They are MLB's property and this is a public site, so check MLB's terms before sharing the app widely. This is also an exception to the "no MLB trademarks" rule in the original brief. If a photo can't load (offline, or a very new call-up), a plain cartoon face is shown instead. To turn photos off, delete the `<image ...>` line in `avatar()` in `src/ui/scene.js`.
+
 **Data script**
 
 1. **The count table doesn't match the intuition "3-1 is a hitter's count = bigger HR chance".** I built it exactly as specified: HR rate of plate appearances *that reach* each count ÷ overall rate. Because many PAs that reach 3-1 end in a walk (no chance of a HR), the value for 3-1 is **0.79x**, not above 1. Only 1-0 (1.04x) is above 1; 0-2 is 0.56x. The numbers are right for "chance of a HR in the *rest of this PA*", but the "why" list will mostly show counts as ▼. If you want hitter's counts to look like ▲, a different definition (HR per swing/pitch at that count) is needed.

@@ -229,6 +229,25 @@ def player_table(pa, id_col, hand_col, opp_col, overall_k_key, platoon, mine_is_
     return players
 
 
+# ---------------------------------------------------------------- player names
+def fetch_names(ids):
+    """{player id: full name} from the MLB Stats API (100 ids per request), cached on disk."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    path = CACHE_DIR / "names.json"
+    names = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    missing = [i for i in sorted(ids) if i not in names]
+    for start in range(0, len(missing), 100):
+        chunk = missing[start:start + 100]
+        url = "https://statsapi.mlb.com/api/v1/people?personIds=" + ",".join(chunk)
+        try:
+            for person in json.load(urllib.request.urlopen(url))["people"]:
+                names[str(person["id"])] = person["fullName"]
+        except Exception as err:  # noqa: BLE001 - a failed batch just leaves those players unnamed
+            print(f"  could not fetch names for a batch: {err}")
+    path.write_text(json.dumps(names), encoding="utf-8")
+    return names
+
+
 # ---------------------------------------------------------------- step 3: park factors
 def fetch_park_factors(year, pa):
     """
@@ -249,11 +268,12 @@ def fetch_park_factors(year, pa):
                      "index_3b": 3 * (pa["tb"] == 3).sum(), "index_hr": 4 * (pa["tb"] == 4).sum()}
     total = sum(bases_by_kind.values())
 
+    names = {r["venue_id"]: r["venue_name"] for r in rows}
     hr = {r["venue_id"]: int(r["index_hr"]) for r in rows}
     k = {r["venue_id"]: int(r["index_so"]) for r in rows}
     tb = {r["venue_id"]: round(sum(float(r[key]) * w for key, w in bases_by_kind.items()) / total)
           for r in rows}
-    return hr, k, tb, rows[0].get("year_range", "")
+    return hr, k, tb, names, rows[0].get("year_range", "")
 
 
 # ---------------------------------------------------------------- main
@@ -272,7 +292,7 @@ def main():
     platoon_bat = {st: league_platoon(pa, "stand", "p_throws", c["col"]) for st, c in STATS.items()}
     platoon_pit = {st: league_platoon(pa, "p_throws", "stand", c["col"]) for st, c in STATS.items()}
 
-    park_hr, park_k, park_tb, park_range = fetch_park_factors(PARK_YEAR, pa)
+    park_hr, park_k, park_tb, park_names, park_range = fetch_park_factors(PARK_YEAR, pa)
     counts = count_tables(season_data[COUNT_SEASON])
 
     result = {
@@ -300,9 +320,16 @@ def main():
         "park_hr_factors": park_hr,
         "park_k_factors": park_k,
         "park_tb_factors": park_tb,
+        "park_names": park_names,
         "batters": player_table(pa, "batter", "stand", "p_throws", "k_batter", platoon_bat, True),
         "pitchers": player_table(pa, "pitcher", "p_throws", "stand", "k_pitcher", platoon_pit, False),
     }
+
+    names = fetch_names(set(result["batters"]) | set(result["pitchers"]))
+    for group in ("batters", "pitchers"):
+        for pid, entry in result[group].items():
+            if pid in names:
+                entry["name"] = names[pid]
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

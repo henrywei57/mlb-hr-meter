@@ -61,6 +61,27 @@ function teamInfo(gameTeam, score) {
   return { id: gameTeam.id, name: gameTeam.teamName || gameTeam.name, abbr: gameTeam.abbreviation, score };
 }
 
+// The pitches of a plate appearance, with where each crossed the plate (feet; pX is measured from
+// the catcher's view, positive = toward his right) and the batter's own zone top and bottom.
+// `limit` keeps only the first N pitches (the demo replays an at-bat part way through).
+export function pitchesOf(play, limit = Infinity) {
+  return (play?.playEvents || [])
+    .filter((e) => e.isPitch)
+    .slice(0, limit)
+    .map((e, i) => ({
+      n: i + 1,
+      x: e.pitchData?.coordinates?.pX,
+      z: e.pitchData?.coordinates?.pZ,
+      top: e.pitchData?.strikeZoneTop,
+      bottom: e.pitchData?.strikeZoneBottom,
+      speed: e.pitchData?.startSpeed,
+      type: e.details?.type?.description,
+      call: e.details?.call?.description || e.details?.description,
+      code: e.details?.code,
+      inPlay: !!e.details?.isInPlay,
+    }));
+}
+
 // One completed plate appearance -> one row of the history list.
 function historyRow(play, venueId) {
   const isTop = play.about.isTopInning;
@@ -133,6 +154,7 @@ export function stateFromLiveFeed(feed) {
       atBatIndex: play.atBatIndex,
       batter: { id: String(play.matchup.batter.id), name: play.matchup.batter.fullName, side: play.matchup.batSide.code },
       pitcher: { id: String(play.matchup.pitcher.id), name: play.matchup.pitcher.fullName, hand: play.matchup.pitchHand.code },
+      pitches: pitchesOf(play),
     };
   } else if (line.offense?.batter && line.defense?.pitcher) {
     // Between batters: show the next batter at a fresh 0-0 count.
@@ -144,6 +166,7 @@ export function stateFromLiveFeed(feed) {
       atBatIndex: (play?.atBatIndex ?? -1) + 1, // the at-bat after the one that just finished
       batter: { id: String(batter.id), name: batter.fullName, side: batSideFor(gd.players["ID" + batter.id], pitchHand) },
       pitcher: { id: String(pitcher.id), name: pitcher.fullName, hand: pitchHand },
+      pitches: [],
     };
   }
   return state;
@@ -214,6 +237,8 @@ export function demoStateAt(feed, frames, step, phase = 1) {
     atBatIndex: p.atBatIndex,
     batter: { id: String(p.matchup.batter.id), name: p.matchup.batter.fullName, side: p.matchup.batSide.code },
     pitcher: { id: String(p.matchup.pitcher.id), name: p.matchup.pitcher.fullName, hand: p.matchup.pitchHand.code },
+    // Phase 1 shows every pitch up to the decisive one (the count the meter is showing).
+    pitches: phase === 0 ? [] : pitchesOf(p, p.playEvents.filter((e) => e.isPitch).length - 1),
   };
   return state;
 }

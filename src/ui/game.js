@@ -10,6 +10,7 @@ import { getSettings } from "../settings.js";
 import { loadCalls, saveCalls, newCall, withCall, withoutPending, resolveCalls, pointsFor, callId, KINDS } from "../calls.js";
 import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
+import { zoneHtml } from "./zone.js";
 import { sceneHtml, resultSceneHtml, playResult } from "./scene.js";
 
 const handWord = (h) => (h === "L" ? "Left" : "Right");
@@ -51,6 +52,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     <div id="toast" class="toast" role="status" hidden></div>
     <p class="kbd-hint">Keyboard: <kbd>H</kbd> call home run · <kbd>B</kbd> call 2+ bases · <kbd>K</kbd> call strikeout · <kbd>Space</kbd> pause demo</p>
     </div><div class="col-side">
+    <section id="zone" class="card zone" hidden></section>
     <section id="why" class="card" hidden></section>
     <section id="history" class="card"></section>
     </div></div>`;
@@ -74,6 +76,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   let offline = false;
   let lastSpikeKey = null;
   let calls = loadCalls();        // the player's home run calls (saved on the phone)
+  let openPitch = null;           // pitch number tapped in the strike zone card
   const openWhy = new Set();      // "Why" rows whose tip is expanded
   const openHist = new Set();     // history rows that are expanded
   let whatIfCount = null;         // count picked in the "try another count" grid, e.g. "3-1"
@@ -179,6 +182,12 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
         <div class="right"><div class="role">Pitching</div><div class="player">${esc(pitcher.name)}</div></div>
       </div>
       <div class="stat-line">${line}<span class="muted">season</span></div>`;
+  }
+
+  function drawZone(s) {
+    const el = $("zone");
+    el.hidden = !s.current;
+    if (s.current) el.innerHTML = zoneHtml(s.current.pitches, openPitch);
   }
 
   function drawMeter(s) {
@@ -354,6 +363,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     drawScene(state);
     drawMatchup(state);
     drawMeter(state);
+    drawZone(state);
     drawCallBox(state);
     drawExtras(state);
     drawHistory(state);
@@ -426,6 +436,9 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
       const key = hit("[data-count]").dataset.count;
       whatIfCount = whatIfCount === key ? null : key;
       drawMeter(state);
+    } else if (hit("[data-pitch]")) {
+      openPitch = Number(hit("[data-pitch]").dataset.pitch);
+      drawZone(state);
     } else if (hit("[data-hist]")) {
       const id = Number(hit("[data-hist]").dataset.hist);
       openHist.has(id) ? openHist.delete(id) : openHist.add(id);

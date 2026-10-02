@@ -343,3 +343,16 @@ kbd { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; b
 .scene .banner-sub { font: 700 11px -apple-system, "Segoe UI", sans-serif; fill: #fff; stroke: rgba(0, 0, 0, 0.55); stroke-width: 3px; paint-order: stroke; }
 .scene .hit-banner.hr .banner-main { font-size: 28px; fill: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .scene .hit-ball { display: none; } }
+
+/* ---------- Strike zone card ---------- */
+.zone-svg { width: 100%; max-width: 360px; display: block; margin: 8px auto; background: #141a24; border-radius: 10px; }
+.zone-box { fill: rgba(255, 255, 255, 0.04); stroke: #f2f4f8; stroke-width: 2; }
+.zone-shadow { fill: none; stroke: #6b7587; stroke-width: 1; stroke-dasharray: 4 4; }
+.zone-grid line { stroke: rgba(255, 255, 255, 0.25); stroke-width: 1; }
+.zone-plate { fill: #e8e8e8; stroke: #8a8f99; stroke-width: 1; }
+.zone-pitch { cursor: pointer; }
+.zone-pitch text { font: 700 12px -apple-system, "Segoe UI", sans-serif; fill: #10131a; pointer-events: none; }
+.zone-pitch.latest circle { stroke: #fff; stroke-width: 2.5; }
+.zone-detail { margin: 6px 0; text-align: center; }
+.zone-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; font-size: 12px; color: var(--muted); margin: 6px 0; }
+.zone-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }

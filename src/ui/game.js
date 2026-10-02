@@ -57,6 +57,15 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
 
   const $ = (id) => root.querySelector("#" + id);
   const meterEl = $("meter");
+  // On a computer the home run meter sits at the top of the right column; on a phone it stays
+  // in the single column, right under the matchup.
+  const wide = window.matchMedia("(min-width: 960px)");
+  const placeMeter = () => {
+    if (wide.matches) root.querySelector(".col-side").prepend(meterEl);
+    else $("matchup").after(meterEl);
+  };
+  placeMeter();
+  wide.addEventListener("change", placeMeter);
   const leagueText = `League average: about ${pct(rates.league.hr_per_pa)}`;
   $("m-ref").textContent = leagueText;
 
@@ -446,5 +455,5 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   });
 
   source.start();
-  return () => { clearInterval(clock); clearTimeout(toastTimer); clearTimeout(sceneTimer); document.removeEventListener("keydown", onKey); source.stop(); }; // called when leaving this screen
+  return () => { clearInterval(clock); clearTimeout(toastTimer); clearTimeout(sceneTimer); document.removeEventListener("keydown", onKey); wide.removeEventListener("change", placeMeter); source.stop(); }; // called when leaving this screen
 }

@@ -5,7 +5,7 @@ build_demo.py - saves a finished 2026 postseason game with 2+ home runs for the 
     python scripts/build_demo.py --game-pk 849846
 
 Writes public/data/demo_game.json: the game's full MLB "feed/live" JSON, plus a "_batterLines"
-map (regular-season AVG/HR/OPS for every batter) so the demo works fully offline.
+map (regular-season AVG/HR/OPS for every batter) and a "_winProb" list so the demo works fully offline.
 Uses only the Python standard library.
 """
 
@@ -63,6 +63,14 @@ def main():
             stat = splits[0]["stat"]
             lines[str(person["id"])] = {"avg": stat["avg"], "hr": stat["homeRuns"], "ops": stat["ops"]}
     feed["_batterLines"] = lines
+
+    # MLB's win probability after every play (home team, 0-100), so the demo can show it offline
+    wp = get(f"{API}/v1/game/{game_pk}/winProbability")
+    feed["_winProb"] = [
+        {"i": p["about"]["atBatIndex"], "inning": p["about"]["inning"], "isTop": p["about"]["isTopInning"],
+         "home": p["homeTeamWinProbability"], "added": p["homeTeamWinProbabilityAdded"], "event": p["result"].get("event", "")}
+        for p in wp
+    ]
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(feed, separators=(",", ":")), encoding="utf-8")

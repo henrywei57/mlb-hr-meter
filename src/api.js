@@ -24,6 +24,11 @@ export function fetchFeed(gamePk) {
   return getJson(`${MLB_API}/v1.1/game/${gamePk}/feed/live`, true);
 }
 
+// Win probability from MLB: the current chance (tiny), and the whole game's play-by-play series
+// (about 130 KB compressed, so we only ask for it when a play has finished).
+export const fetchContextMetrics = (gamePk) => getJson(`${MLB_API}/v1/game/${gamePk}/contextMetrics`, true);
+export const fetchWinProbabilityList = (gamePk) => getJson(`${MLB_API}/v1/game/${gamePk}/winProbability`, true);
+
 // Regular-season AVG / HR / OPS for a batter. Cached so we only ask once per player.
 // (The live feed's own "season stats" are postseason-only in October, so we ask separately.)
 const lineCache = new Map();

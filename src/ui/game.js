@@ -11,6 +11,7 @@ import { THEMES, currentTheme, nextTheme, applyTheme } from "../theme.js";
 import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
 import { zoneHtml } from "./zone.js";
+import { drawWinProbability } from "./wp.js";
 import { createStage } from "./stage.js";
 
 const handWord = (h) => (h === "L" ? "Left" : "Right");
@@ -38,16 +39,26 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     <div id="banner" class="banner" hidden></div>
     <div class="game-grid"><div class="col-main">
     <section id="score" class="card score"></section>
+    <section id="wp" class="card wp"></section>
     <section id="scene" class="card scene" hidden></section>
     <section id="matchup" class="card"></section>
-    <section id="meter" class="card meter">
-      <div class="meter-number" id="m-num">–</div>
-      <div class="meter-label">Home run chance, this at-bat <span id="m-est" class="estimate" hidden>estimate</span></div>
-      <div class="meter-times" id="m-times"></div>
-      <div class="meter-ref" id="m-ref"></div>
-      <div class="meter-updated" id="m-updated"></div>
+    <section id="extras" class="extras" hidden>
+      <div class="extra-tile" id="x-hr">
+        <div class="extra-label">Home run chance <span id="m-est" class="estimate" hidden>est.</span></div>
+        <div class="extra-number" id="x-hr-n">–</div>
+        <div class="extra-ref" id="x-hr-r"></div>
+      </div>
+      <div class="extra-tile">
+        <div class="extra-label">Expected total bases</div>
+        <div class="extra-number" id="x-tb-n">–</div>
+        <div class="extra-ref" id="x-tb-r"></div>
+      </div>
+      <div class="extra-tile">
+        <div class="extra-label">Strikeout chance</div>
+        <div class="extra-number" id="x-k-n">–</div>
+        <div class="extra-ref" id="x-k-r"></div>
+      </div>
     </section>
-    <section id="extras" class="extras" hidden></section>
     <p class="kbd-hint">Keyboard: <kbd>Space</kbd> pause or resume the demo</p>
     </div><div class="col-side">
     <section id="zone" class="card zone" hidden></section>
@@ -56,13 +67,14 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     </div></div>`;
 
   const $ = (id) => root.querySelector("#" + id);
-  const meterEl = $("meter");
-  // On a computer the home run meter sits at the top of the right column; on a phone it stays
-  // in the single column, right under the matchup.
+  const wpEl = $("wp");
+  const hrTile = $("x-hr");
+  // On a computer the win probability card sits at the top of the right column; on a phone it stays
+  // in the single column, right under the score.
   const wide = window.matchMedia("(min-width: 960px)");
   const placeMeter = () => {
-    if (wide.matches) root.querySelector(".col-side").prepend(meterEl);
-    else $("matchup").after(meterEl);
+    if (wide.matches) root.querySelector(".col-side").prepend(wpEl);
+    else $("score").after(wpEl);
   };
   placeMeter();
   wide.addEventListener("change", placeMeter);
@@ -71,8 +83,6 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   const showThemeName = () => { themeBtn.textContent = `Theme: ${THEMES[currentTheme()].label}`; };
   themeBtn.addEventListener("click", () => { applyTheme(nextTheme(), true); showThemeName(); });
   showThemeName();
-  const leagueText = `League average: about ${pct(rates.league.hr_per_pa)}`;
-  $("m-ref").textContent = leagueText;
 
   let state = null;
   let lastUpdate = 0; // when we last got fresh data
@@ -150,23 +160,24 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     if (s.current) el.innerHTML = zoneHtml(s.current.pitches, openPitch);
   }
 
-  function drawMeter(s) {
+  // The home run chance tile (it glows on a spike) and the "Why" breakdown under it.
+  function drawHr(s) {
     const prediction = s.current?.prediction;
     if (!prediction) {
-      $("m-num").textContent = "–";
-      $("m-times").textContent = "";
+      $("x-hr-n").textContent = "–";
+      $("x-hr-r").textContent = "";
       $("m-est").hidden = true;
-      meterEl.classList.remove("spike");
+      hrTile.classList.remove("spike");
       $("why").hidden = true;
       return;
     }
-    $("m-num").textContent = pct(prediction.probability);
-    $("m-times").textContent = `${prediction.timesLeague.toFixed(1)}x the league average`;
+    $("x-hr-n").textContent = pct(prediction.probability);
+    $("x-hr-r").textContent = `${prediction.timesLeague.toFixed(1)}x league avg (${pct(prediction.leagueRate)})`;
     $("m-est").hidden = !prediction.isEstimate;
 
     // Spike cue: glow/pulse while the chance is high; buzz once when a new spike starts.
     const spike = prediction.timesLeague >= getSettings().spikeMultiple;
-    meterEl.classList.toggle("spike", spike);
+    hrTile.classList.toggle("spike", spike);
     const key = spike ? `${s.current.batter.id}-${s.balls}-${s.strikes}` : null;
     if (key && key !== lastSpikeKey) buzz();
     lastSpikeKey = key;
@@ -198,24 +209,17 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
       <p class="note">Rows are balls (0-3), columns are strikes (0-2). Yellow outline = the current count.</p>`;
   }
 
-  // The two smaller tiles under the home run meter: expected total bases and strikeout chance.
+  // The expected total bases and strikeout tiles.
   function drawExtras(s) {
     const box = $("extras");
     if (!s.current?.predictions || !s.isLive) { box.hidden = true; return; } // (older saved copies have no extras)
     box.hidden = false;
     const { tb, k } = s.current.predictions;
     const xbh = s.current.extraBase;
-    box.innerHTML = `
-      <div class="extra-tile">
-        <div class="extra-label">Expected total bases</div>
-        <div class="extra-number">${tb.value.toFixed(2)}</div>
-        <div class="extra-ref">League avg ${tb.leagueRate.toFixed(2)}${xbh != null ? ` · 2+ bases about ${pct(xbh)}` : ""}</div>
-      </div>
-      <div class="extra-tile">
-        <div class="extra-label">Strikeout chance</div>
-        <div class="extra-number">${pct(k.value)}</div>
-        <div class="extra-ref">League avg ${pct(k.leagueRate)}</div>
-      </div>`;
+    $("x-tb-n").textContent = tb.value.toFixed(2);
+    $("x-tb-r").textContent = `League avg ${tb.leagueRate.toFixed(2)}${xbh != null ? ` · 2+ bases ${pct(xbh)}` : ""}`;
+    $("x-k-n").textContent = pct(k.value);
+    $("x-k-r").textContent = `League avg ${pct(k.leagueRate)}`;
   }
 
   function drawHistory(s) {
@@ -247,7 +251,8 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     drawScore(state);
     stage.update(state);
     drawMatchup(state);
-    drawMeter(state);
+    drawWinProbability(wpEl, state, colors);
+    drawHr(state);
     drawZone(state);
     drawExtras(state);
     drawHistory(state);
@@ -257,7 +262,8 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   // Runs every second: keeps "Updated X seconds ago" and the offline banner current.
   function tick() {
     if (!lastUpdate) return;
-    $("m-updated").textContent = `Updated ${timeAgo(lastUpdate)}`;
+    const updated = $("m-updated");
+    if (updated) updated.textContent = `Updated ${timeAgo(lastUpdate)}`;
     const banner = $("banner");
     banner.hidden = !offline;
     if (offline) banner.textContent = `No connection. Showing the numbers from ${timeAgo(lastUpdate)}. Retrying automatically…`;
@@ -306,11 +312,11 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     if (hit("[data-why]")) {
       const key = hit("[data-why]").dataset.why;
       openWhy.has(key) ? openWhy.delete(key) : openWhy.add(key);
-      drawMeter(state);
+      drawHr(state);
     } else if (hit("[data-count]")) {
       const key = hit("[data-count]").dataset.count;
       whatIfCount = whatIfCount === key ? null : key;
-      drawMeter(state);
+      drawHr(state);
     } else if (hit("[data-pitch]")) {
       openPitch = Number(hit("[data-pitch]").dataset.pitch);
       drawZone(state);

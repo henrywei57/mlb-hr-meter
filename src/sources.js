@@ -5,8 +5,9 @@
 // The game screen doesn't care which one it has.
 
 import { POLL_MS, DEMO_STEP_MS } from "./config.js";
-import { fetchFeed, fetchBatterLine, loadDemoFeed } from "./api.js";
+import { fetchFeed, fetchBatterLine, loadDemoFeed, fetchContextMetrics, fetchWinProbabilityList } from "./api.js";
 import { stateFromLiveFeed, buildDemoFrames, demoStateAt, scoreState } from "./gamestate.js";
+import { seriesFromList, wpAtStart, wpAfterAll, NEUTRAL } from "./winprob.js";
 
 // MLB stamps every feed update, e.g. "20261001_001630" (UTC). When the stamp changes we log how
 // many seconds passed between MLB publishing that update and the app receiving it. That IS the
@@ -26,6 +27,8 @@ export function liveSource(gamePk, rates, { onUpdate, onError }) {
   let timer = null;
   let stopped = false;
   let lastStamp = null;
+  let wp = { ...NEUTRAL, series: [] };   // win probability: the latest we know
+  let seriesFor = -1;                    // how many finished at-bats the series was fetched for
 
   async function poll() {
     clearTimeout(timer);
@@ -33,13 +36,22 @@ export function liveSource(gamePk, rates, { onUpdate, onError }) {
     // Don't spend data/battery while the phone screen is off or the app is in the background.
     if (document.hidden) { schedule(); return; }
     try {
-      const feed = await fetchFeed(gamePk);
+      // The game feed and MLB's (tiny) current win probability, together. A failure of the second
+      // one is not fatal: we just keep the last win probability.
+      const [feed, context] = await Promise.all([fetchFeed(gamePk), fetchContextMetrics(gamePk).catch(() => null)]);
       lastStamp = logLag(feed, lastStamp);
       const state = stateFromLiveFeed(feed);
       if (state.current) {
         state.current.batterLine = await fetchBatterLine(state.current.batter.id, feed.gameData.game.season);
       }
       scoreState(state, rates);
+
+      if (Number.isFinite(context?.homeWinProbability)) wp = { ...wp, home: context.homeWinProbability, away: context.awayWinProbability };
+      if (state.history.length !== seriesFor) {
+        // a play finished since we last looked: fetch the whole win probability series for the chart
+        try { wp = { ...wp, series: seriesFromList(await fetchWinProbabilityList(gamePk)) }; seriesFor = state.history.length; } catch { /* keep the old chart */ }
+      }
+      state.wp = wp;
       if (!stopped) onUpdate(state, Date.now());
       if (state.isFinal) return; // nothing more will change; stop polling
     } catch (error) {
@@ -84,6 +96,9 @@ export function demoSource(rates, { onUpdate, onError }) {
     const state = demoStateAt(feed, frames, step, phase);
     if (state.current) state.current.batterLine = feed._batterLines?.[state.current.batter.id] ?? null;
     scoreState(state, rates);
+    // the win chance at the start of this at-bat (from the saved copy of MLB's numbers)
+    const series = feed._winProb || [];
+    state.wp = state.current ? wpAtStart(series, state.current.atBatIndex) : wpAfterAll(series);
     onUpdate(state, Date.now());
   }
 

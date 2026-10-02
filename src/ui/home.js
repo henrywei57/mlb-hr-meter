@@ -51,6 +51,7 @@ export function showHome(root) {
     <header class="top"><h1>Today's Games</h1></header>
     <div class="actions">
       <a class="demo-button" href="#/demo">Demo game <small>replay a real playoff game with 4 home runs</small></a>
+      <a class="lab-button" href="#/lab">Matchup Lab <small>pit any batter against any pitcher</small></a>
     </div>
     <details class="card settings">
       <summary>Settings</summary>

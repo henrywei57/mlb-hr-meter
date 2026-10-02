@@ -11,6 +11,7 @@ import { getSettings, saveSettings } from "../settings.js";
 import { teamColor, esc, pct } from "../util.js";
 import { countMood, sceneHtml, resultSceneHtml, playResult } from "./scene.js";
 import { playCrack, playCheer } from "../audio.js";
+import { typeColor } from "../pitchdata.js";
 import { webglAvailable } from "./gl.js";
 
 // The camera views (their positions live in scene3d.js; this is just the buttons)
@@ -18,7 +19,7 @@ const VIEW_BUTTONS = [["catcher", "Catcher"], ["side", "Side"], ["pitcher", "Pit
 
 const handWord = (h) => (h === "L" ? "left" : "right");
 
-export function createStage(host, { colors }) {
+export function createStage(host, { colors, compact = false }) {
   let mode = null;              // "3d" or "2d"
   let stage3d = null;           // the Three.js stage, once loaded
   let state = null;             // the latest game state
@@ -39,11 +40,13 @@ export function createStage(host, { colors }) {
     if (!chip || !pitch) return;
     const parts = [pitch.speed ? `${pitch.speed.toFixed(1)} mph` : null, pitch.type || null].filter(Boolean);
     if (!parts.length) return;
-    chip.textContent = parts.join("  ·  ");
+    chip.innerHTML = `<i class="chip-dot" style="background:${typeColor(pitch.typeCode)}"></i>${esc(parts.join("  ·  "))}`;
     chip.hidden = false;
     clearTimeout(chipTimer);
     chipTimer = setTimeout(() => { chip.hidden = true; }, 3200);
   }
+
+  let ready = Promise.resolve();   // resolves once the 3D scene (if any) is on the page
 
   const wantsThree = () => getSettings().visual !== "2d" && webglAvailable();
 
@@ -67,7 +70,7 @@ export function createStage(host, { colors }) {
         </div>
         <div class="stage-controls tools">
           <button type="button" class="chip-btn" data-stage="pitch">Replay pitch</button>
-          <button type="button" class="chip-btn" data-stage="hit">Replay last hit</button>
+          ${compact ? "" : `<button type="button" class="chip-btn" data-stage="hit">Replay last hit</button>`}
           <button type="button" class="chip-btn" data-stage="snap">Snapshot</button>
           ${toggle}
         </div>
@@ -119,12 +122,17 @@ export function createStage(host, { colors }) {
     return Array.from({ length: max }, (_, i) => `<i class="hud-dot ${cls} ${i < n ? "on" : ""}"></i>`).join("");
   }
 
+  // Build the stage (3D if possible). update() does this on its first call; screens that only
+  // replay pitches (the Saved screen) call it directly.
+  function init() {
+    if (mode) return;
+    if (wantsThree()) { build("2d"); ready = start3d(); } else build("2d");
+  }
+
   function update(s) {
     state = s;
     if (disposed) return;
-    if (!mode) { // first call
-      if (wantsThree()) { build("2d"); start3d(); } else build("2d");
-    }
+    if (!mode) init(); // first call
     if (Date.now() < busyUntil) return;
     if (!s.current || !s.isLive) { host.hidden = true; sceneKey = null; return; }
     host.hidden = false;
@@ -206,9 +214,9 @@ export function createStage(host, { colors }) {
       busyUntil = 0; // (a replay in progress is simply dropped)
       saveSettings({ visual: mode === "3d" ? "2d" : "3d" });
       if (mode === "3d") { build("2d"); if (state) update(state); }
-      else if (webglAvailable()) { build("2d"); start3d(); }
+      else if (webglAvailable()) { build("2d"); ready = start3d(); }
     } else if (action === "pitch" && stage3d && lastPitch) {
-      stage3d.throwPitch(lastPitch); showPitchChip(lastPitch);
+      stage3d.throwPitch(lastPitch, { showPath: true }); showPitchChip(lastPitch);
     } else if (action === "hit" && stage3d && lastHit) {
       busyUntil = Date.now() + stage3d.playHit(lastHit) + 400;
     } else if (action === "snap" && stage3d) {
@@ -230,12 +238,36 @@ export function createStage(host, { colors }) {
   function replayPitch(n) {
     const pitch = currentPitches.find((p) => p.n === n);
     if (!pitch || !stage3d) return;
-    stage3d.throwPitch(pitch);
+    stage3d.throwPitch(pitch, { showPath: true });
     showPitchChip(pitch);
   }
 
+  /**
+   * Replay ANY pitch of the game (from the Pitch finder or the Saved screen): put that at-bat's
+   * pitcher and batter on the field, fly the ball along its real path and draw the path.
+   * Returns false if there is no 3D scene (the caller then shows a flat view instead).
+   */
+  function replayFull(ctx, pitch) {
+    if (mode !== "3d" || !stage3d) return false;
+    stage3d.setPlayers({
+      batSide: ctx.batter.side, pitchHand: ctx.pitcher.hand, batterId: ctx.batter.id, pitcherId: ctx.pitcher.id,
+      batColor: teamColor(colors, ctx.battingTeamId), pitchColor: teamColor(colors, ctx.fieldingTeamId),
+    });
+    stage3d.setMood({ balls: pitch.balls ?? 0, strikes: pitch.strikes ?? 0, spike: false });
+    stage3d.setZone([pitch], pitch.top ?? 3.4, pitch.bottom ?? 1.6);
+    lastPitch = pitch; currentPitches = [pitch]; // (so "Replay pitch" repeats this one)
+    const seconds = stage3d.throwPitch(pitch, { showPath: true });
+    showPitchChip(pitch);
+    host.hidden = false;
+    // leave the scene alone while it plays and the path lingers, then go back to the live at-bat
+    busyUntil = Date.now() + (seconds + 6.5) * 1000;
+    clearTimeout(busyTimer);
+    busyTimer = setTimeout(() => { busyUntil = 0; if (state) { stage3d?.clearPath(); lastAtBat = null; update(state); } }, (seconds + 6.5) * 1000);
+    return true;
+  }
+
   const api = {
-    update, hit, replayPitch,
+    update, hit, replayPitch, replayFull, init, whenReady: () => ready,
     get stage3d() { return stage3d; },
     get mode() { return mode; },
     dispose() {

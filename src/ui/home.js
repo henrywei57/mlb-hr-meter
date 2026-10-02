@@ -4,6 +4,7 @@ import { fetchSchedule } from "../api.js";
 import { esc, mlbDateString, saveLocal, loadLocal } from "../util.js";
 import { getSettings, saveSettings } from "../settings.js";
 import { THEMES, currentTheme, applyTheme } from "../theme.js";
+import { loadSaved } from "../saved.js";
 
 const REFRESH_MS = 30000;
 
@@ -18,6 +19,11 @@ function statusInfo(game) {
   const time = new Date(game.gameDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const odd = ["Postponed", "Suspended", "Cancelled"].includes(game.status.detailedState);
   return { rank: 1, text: odd ? game.status.detailedState : time, kind: "upcoming" };
+}
+
+function savedSummary() {
+  const n = loadSaved().length;
+  return n ? `${n} saved pitch${n === 1 ? "" : "es"}, ready to replay` : "save pitches from a game and replay them here";
 }
 
 function sortGames(games) {
@@ -52,6 +58,7 @@ export function showHome(root) {
     <div class="actions">
       <a class="demo-button" href="#/demo">Demo game <small>replay a real playoff game with 4 home runs</small></a>
       <a class="lab-button" href="#/lab">Matchup Lab <small>pit any batter against any pitcher</small></a>
+      <a class="lab-button" href="#/saved">Saved pitches <small>${savedSummary()}</small></a>
     </div>
     <details class="card settings">
       <summary>Settings</summary>

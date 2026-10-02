@@ -16,6 +16,7 @@
 import * as THREE from "../../public/vendor/three.module.min.js";
 import { themeVar } from "../theme.js";
 import { countMood, headshotUrl, TAGS, RING } from "./scene.js";
+import { typeColor } from "../pitchdata.js";
 
 const PLATE_W = 17 / 12;             // home plate is 17 inches wide
 const MOUND_Z = -60.5;
@@ -529,6 +530,34 @@ export function createStage3d(container, hooks = {}) {
   }
   const clearTrail = () => { trailPts.length = 0; trail.forEach((m) => { m.visible = false; }); };
 
+  // ---------------------------------------------------------------- the flight path
+  // A glowing tube that draws itself along the ball's route as it flies and stays for a few seconds,
+  // so you can see the whole path (a pitch's break, or a batted ball's arc), not just the ball.
+  const pathGroup = new THREE.Group(); world.add(pathGroup);
+  let pathObj = null; // { mesh, total (index count), life (seconds left once the flight is over) }
+  function clearPath() {
+    if (!pathObj) return;
+    pathGroup.remove(pathObj.mesh);
+    pathObj.mesh.geometry.dispose(); pathObj.mesh.material.dispose();
+    pathObj = null;
+  }
+  function buildPath(points, radius, color) {
+    clearPath();
+    const curve = new THREE.CatmullRomCurve3(points);
+    const geo = new THREE.TubeGeometry(curve, Math.max(40, points.length * 2), radius, 8, false);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, fog: false }));
+    const total = geo.index.count;
+    geo.setDrawRange(0, 0);
+    pathGroup.add(mesh);
+    pathObj = { mesh, total, life: Infinity };
+  }
+  function setPathProgress(fraction) {
+    if (!pathObj) return;
+    pathObj.mesh.geometry.setDrawRange(0, Math.floor((clamp(fraction, 0, 1) * pathObj.total) / 3) * 3);
+  }
+  // Once the flight is over, keep the path on screen for `seconds`, then fade it away.
+  const holdPath = (seconds) => { if (pathObj) pathObj.life = seconds; };
+
   // ---------------------------------------------------------------- the pitch
   // MLB's tracking gives position(t) = p0 + v0*t + a*t^2/2 in feet, with the "y" axis measured
   // from the plate toward the pitcher. We map it to our axes: world x = x, world y = z (height),
@@ -548,7 +577,7 @@ export function createStage3d(container, hooks = {}) {
   }
 
   /** Throw one pitch. `pitch` carries MLB's tracking data (pitch.path) when it has it. */
-  function throwPitch(pitch, { stopAtBat = false } = {}) {
+  function throwPitch(pitch, { stopAtBat = false, showPath = false } = {}) {
     const c = pitch?.path;
     const hand = releasePoint();
     let plateTime = c?.plateTime || 0.42;   // (when the ball reaches the catcher's mitt)
@@ -561,8 +590,23 @@ export function createStage3d(container, hooks = {}) {
     const arrive = c ? pitchPosition(c, plateTime) : new THREE.Vector3(pitch?.x ?? 0, pitch?.z ?? 2.5, -1.4);
     const dur = clamp(plateTime * 3.4, 1.0, 1.7);   // slow motion so you can follow it
     const windup = 0.5;
-    anim = { kind: "pitch", t: 0, windup, dur, hand, arrive, c, plateTime, released: false };
+    anim = { kind: "pitch", t: 0, windup, dur, hand, arrive, c, plateTime, released: false, showPath };
     clearTrail();
+    if (showPath && !stopAtBat) {
+      // the route the ball will take: from the pitcher's hand, then MLB's tracked path to the catcher
+      const points = [];
+      if (c) {
+        const start = pitchPosition(c, 0);
+        for (let i = 0; i <= 3; i++) points.push(hand.clone().lerp(start, ease(i / 3)));
+        for (let i = 1; i <= 30; i++) points.push(pitchPosition(c, (i / 30) * plateTime));
+      } else {
+        for (let i = 0; i <= 12; i++) { const q = hand.clone().lerp(arrive, i / 12); q.y += Math.sin((i / 12) * Math.PI) * 0.5; points.push(q); }
+      }
+      buildPath(points, 0.14, typeColor(pitch?.typeCode));
+    } else if (!stopAtBat) {
+      clearPath();
+    }
+    return windup + dur + 0.5; // how long until the ball has landed (seconds)
   }
 
   function pitchBallAt(frac) {
@@ -627,6 +671,9 @@ export function createStage3d(container, hooks = {}) {
     anim.total = anim.contactAt + flightSecs + 1.6;
     anim.swingStart = anim.contactAt - 0.2;
     anim.followFrom = null;
+    // the batted ball's route, drawn as it flies
+    const arc = Array.from({ length: 41 }, (_, i) => traj.at(i / 40));
+    buildPath(arc, 0.45, "#ffd23f");
     return Math.round(anim.total * 1000);
   }
 
@@ -736,6 +783,11 @@ export function createStage3d(container, hooks = {}) {
       }
     }
     if (anim) stepAnim(dt);
+    if (pathObj && Number.isFinite(pathObj.life)) {
+      pathObj.life -= dt;
+      pathObj.mesh.material.opacity = clamp(pathObj.life / 1.2, 0, 0.95);
+      if (pathObj.life <= 0) clearPath();
+    }
     applyCamera(dt);
     // keep the ball and its trail a readable size even when it is far from the camera
     const bigger = clamp(camera.position.distanceTo(ball.position) / 38, 1, 9);
@@ -763,9 +815,12 @@ export function createStage3d(container, hooks = {}) {
         const p = pitchBallAt(flightT / anim.dur);
         ball.position.copy(p); pushTrail(p);
         anim.ballPos = p;
+        if (anim.kind === "pitch" && anim.showPath) setPathProgress(flightT / anim.dur);
       }
       if (anim.kind === "pitch" && flightT > anim.dur + 0.5) {
-        ball.visible = false; clearTrail(); pitcher.heldBall.visible = true; anim = null; return;
+        ball.visible = false; clearTrail(); pitcher.heldBall.visible = true;
+        if (anim.showPath) { setPathProgress(1); holdPath(6); }
+        anim = null; return;
       }
     }
     if (anim.kind === "hit") stepHit(t);
@@ -797,6 +852,7 @@ export function createStage3d(container, hooks = {}) {
       const p = a.traj.at(u);
       ball.position.copy(p); pushTrail(p);
       a.ballPos = p;
+      setPathProgress(u);
       follow.target.copy(p);
       follow.fov = clamp(38 + (a.traj.dist / 450) * 22, 38, 62);
       if (!a.bannerShown && u > 0.55) {
@@ -809,6 +865,7 @@ export function createStage3d(container, hooks = {}) {
     if (t > flightStart + a.flightSecs) { ball.visible = a.info.event !== "home_run" && t < flightStart + a.flightSecs + 0.7; if (!ball.visible) clearTrail(); }
     if (t >= a.total) {
       follow = null; ball.visible = false; clearTrail(); hooks.onBannerHide?.();
+      setPathProgress(1); holdPath(3);
       anim = null;
       hooks.onHitDone?.();
     }
@@ -854,6 +911,7 @@ export function createStage3d(container, hooks = {}) {
     playHit,
     get busy() { return !!anim; },
     setView,
+    clearPath,
     refreshTheme() { applyTheme(); },
     /** Advance time by hand (used by tests; the real loop calls this every frame). */
     advance(seconds, step = 1 / 30) { for (let t = 0; t < seconds; t += step) animate(step); renderer.render(scene, camera); },

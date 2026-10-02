@@ -3,6 +3,7 @@
 import { fetchSchedule } from "../api.js";
 import { esc, mlbDateString, saveLocal, loadLocal } from "../util.js";
 import { getSettings, saveSettings } from "../settings.js";
+import { THEMES, currentTheme, applyTheme } from "../theme.js";
 
 const REFRESH_MS = 30000;
 
@@ -53,6 +54,14 @@ export function showHome(root) {
     </div>
     <details class="card settings">
       <summary>Settings</summary>
+      <div class="setting">Theme
+        <div class="theme-picker" role="radiogroup" aria-label="Theme">
+          ${Object.entries(THEMES).map(([key, t]) => `
+            <button type="button" class="theme-swatch ${key === currentTheme() ? "on" : ""}" role="radio" aria-checked="${key === currentTheme()}" data-theme-pick="${key}">
+              <span class="swatch-dots">${t.swatch.map((c) => `<i style="background:${c}"></i>`).join("")}</span>${t.label}
+            </button>`).join("")}
+        </div>
+      </div>
       <label class="setting">Glow and buzz when the chance is at least
         <select id="spike-select">
           ${[1.5, 2, 3, 4].map((m) => `<option value="${m}" ${getSettings().spikeMultiple === m ? "selected" : ""}>${m}x the league average</option>`).join("")}
@@ -62,6 +71,16 @@ export function showHome(root) {
     </details>
     <div id="notice" class="banner" hidden></div>
     <div id="games"><p class="hint">Loading games…</p></div>`;
+  root.querySelector(".theme-picker").addEventListener("click", (e) => {
+    const pick = e.target.closest("[data-theme-pick]");
+    if (!pick) return;
+    applyTheme(pick.dataset.themePick, true);
+    for (const b of root.querySelectorAll(".theme-swatch")) {
+      const on = b === pick;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-checked", on);
+    }
+  });
   root.querySelector("#spike-select").addEventListener("change", (e) => saveSettings({ spikeMultiple: Number(e.target.value) }));
   root.querySelector("#vibrate-toggle").addEventListener("change", (e) => saveSettings({ vibrate: e.target.checked }));
   const gamesEl = root.querySelector("#games");

@@ -7,9 +7,12 @@ import { loadRates, loadTeamColors } from "./api.js";
 import { liveSource, demoSource } from "./sources.js";
 import { showHome } from "./ui/home.js";
 import { showGame } from "./ui/game.js";
+import { applyTheme } from "./theme.js";
 
 // An earlier version saved "calls" on the device. That feature is gone, so tidy the leftovers.
 try { localStorage.removeItem("hr:calls"); } catch { /* storage unavailable: nothing to clean */ }
+
+applyTheme(); // the saved theme (or Night)
 
 const app = document.getElementById("app");
 let leaveScreen = null; // cleanup function of the screen currently shown (stops timers / polling)

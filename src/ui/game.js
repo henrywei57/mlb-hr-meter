@@ -7,6 +7,7 @@
 import { esc, pct, timeAgo, textOn, teamColor, saveLocal, loadLocal } from "../util.js";
 import { predictHomeRun } from "../model.js";
 import { getSettings } from "../settings.js";
+import { THEMES, currentTheme, nextTheme, applyTheme } from "../theme.js";
 import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
 import { zoneHtml } from "./zone.js";
@@ -26,7 +27,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   root.innerHTML = `
     <header class="top">
       <a class="back" href="#/">‹ Games</a>
-      <span id="chip" class="chip"></span>
+      <span class="header-right"><button type="button" id="theme-btn" class="theme-btn" title="Switch theme"></button><span id="chip" class="chip"></span></span>
     </header>
     <div id="demo-bar" class="demo-bar" hidden>
       <span>Demo replay</span>
@@ -65,6 +66,11 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   };
   placeMeter();
   wide.addEventListener("change", placeMeter);
+  // Quick theme switch: tap to cycle through the themes.
+  const themeBtn = $("theme-btn");
+  const showThemeName = () => { themeBtn.textContent = `Theme: ${THEMES[currentTheme()].label}`; };
+  themeBtn.addEventListener("click", () => { applyTheme(nextTheme(), true); showThemeName(); });
+  showThemeName();
   const leagueText = `League average: about ${pct(rates.league.hr_per_pa)}`;
   $("m-ref").textContent = leagueText;
 

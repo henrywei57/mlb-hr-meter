@@ -2,17 +2,78 @@
    Colors are variables at the top so a redesign from Figma is a quick swap. */
 
 :root {
+  /* ---- Night (the default theme). Every color in the app comes from these variables, and each
+     theme below just overrides them, so adding a theme = copying a block and changing colors. ---- */
   --bg: #0f1218;
   --card: #1a1f2a;
   --card-edge: #2a3140;
+  --card-hover: #212837;
   --text: #f2f4f8;
   --muted: #a3acbd;       /* contrast on --card: about 7:1 */
-  --accent: #ffcf4a;      /* gold: runners, highlights */
+  --accent: #ffcf4a;      /* gold: fills, runners, highlights */
+  --accent-text: #ffcf4a; /* the accent when used as TEXT (darker in light themes so it's readable) */
+  --on-accent: #1a1405;   /* text that sits on top of an accent fill */
   --spike: #ff7a1a;       /* orange glow for a spike */
+  --spike-text: #ffd2a8;
   --up: #ff9d4d;          /* factor makes a homer MORE likely */
   --down: #6cb4ff;        /* factor makes a homer LESS likely */
   --live: #ff4d5e;
+  --warn-bg: #4a3410; --warn-fg: #ffe2a8; --warn-edge: #7a5a1c;
+  --hr-bg: #3a2a08;       /* background of a home run row in the history */
+  --zone-bg: #141a24; --zone-dash: #6b7587; --zone-plate: #e8e8e8;
+  --edge-w: 1px;
   --radius: 14px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* the 3D stadium reads these too */
+  --sky-top: #0b1020; --sky-bottom: #22345c; --grass: #1f5a35; --dirt: #8a6238; --daylight: 0.55;
+  color-scheme: dark;
+}
+
+/* ---- Day: bright and clean ---- */
+:root[data-theme="day"] {
+  --bg: #e9eef5; --card: #ffffff; --card-edge: #cfd8e3; --card-hover: #f1f5fa;
+  --text: #141a24; --muted: #4d586b;
+  --accent: #f5b301; --accent-text: #8a5300; --on-accent: #1a1405;
+  --spike: #e8590c; --spike-text: #b33d00; --up: #b4470a; --down: #1f64c2; --live: #d6283b;
+  --warn-bg: #fff1cc; --warn-fg: #5c3d00; --warn-edge: #e0b84d; --hr-bg: #fff0c2;
+  --zone-bg: #eef2f8; --zone-dash: #7a8599; --zone-plate: #ffffff;
+  --sky-top: #5aa9ee; --sky-bottom: #cfe9ff; --grass: #3f9a52; --dirt: #c89a62; --daylight: 1;
+  color-scheme: light;
+}
+
+/* ---- Ballpark: grass green, chalk white, dusk sky ---- */
+:root[data-theme="ballpark"] {
+  --bg: #0b1f14; --card: #14301f; --card-edge: #25502f; --card-hover: #1a3a26;
+  --text: #f1f7ee; --muted: #a9c7b0;
+  --accent: #f4d35e; --accent-text: #f4d35e; --on-accent: #1c1700;
+  --spike: #ff8a3d; --spike-text: #ffd9b5; --up: #ffb25e; --down: #8ec9ff; --live: #ff5a5f;
+  --warn-bg: #4a3b12; --warn-fg: #ffe9b0; --warn-edge: #8a6e22; --hr-bg: #3b3512;
+  --zone-bg: #0f2518; --zone-dash: #6f9a7b; --zone-plate: #ecefe6;
+  --sky-top: #2b3a67; --sky-bottom: #f2a65a; --grass: #2f7a40; --dirt: #a9743f; --daylight: 0.8;
+}
+
+/* ---- Scoreboard: amber on black, like a stadium board ---- */
+:root[data-theme="scoreboard"] {
+  --bg: #000000; --card: #0b0a05; --card-edge: #5a4a00; --card-hover: #17140a;
+  --text: #ffc83a; --muted: #c9a23a;
+  --accent: #ffc83a; --accent-text: #ffc83a; --on-accent: #000000;
+  --spike: #ff5a1f; --spike-text: #ffd3b0; --up: #ff8a2a; --down: #5fd0ff; --live: #ff3b3b;
+  --warn-bg: #2a1d00; --warn-fg: #ffd470; --warn-edge: #7a5a00; --hr-bg: #2a2000;
+  --zone-bg: #050400; --zone-dash: #8a7020; --zone-plate: #ffc83a;
+  --font: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+  --sky-top: #000000; --sky-bottom: #1a1400; --grass: #1d3d1d; --dirt: #5a4010; --daylight: 0.4;
+}
+
+/* ---- High contrast: black and white with a yellow accent, thick outlines ---- */
+:root[data-theme="contrast"] {
+  --bg: #000000; --card: #000000; --card-edge: #ffffff; --card-hover: #1a1a1a;
+  --text: #ffffff; --muted: #e6e6e6;
+  --accent: #ffe600; --accent-text: #ffe600; --on-accent: #000000;
+  --spike: #ff9100; --spike-text: #ffffff; --up: #ffb74d; --down: #80d8ff; --live: #ff5252;
+  --warn-bg: #000000; --warn-fg: #ffffff; --warn-edge: #ffe600; --hr-bg: #1f1c00;
+  --zone-bg: #000000; --zone-dash: #ffffff; --zone-plate: #ffffff;
+  --edge-w: 2px;
+  --sky-top: #000000; --sky-bottom: #14141f; --grass: #1f5a35; --dirt: #8a6238; --daylight: 0.7;
 }
 
 * { box-sizing: border-box; }
@@ -23,14 +84,14 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font: 16px/1.4 var(--font);
   /* keep content out of the iPhone notch / home bar when installed */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 #app { max-width: 520px; margin: 0 auto; padding: 12px 12px 40px; }
 
-a { color: var(--accent); }
+a { color: var(--accent-text); }
 h1 { font-size: 22px; margin: 0; }
 h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .muted { color: var(--muted); }
@@ -44,13 +105,13 @@ h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: 0.04em; text-transform: u
 .chip { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--card); color: var(--muted); text-transform: uppercase; }
 .chip.live { background: var(--live); color: #fff; }
 
-.card { background: var(--card); border: 1px solid var(--card-edge); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+.card { background: var(--card); border: var(--edge-w) solid var(--card-edge); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
 
-.banner { background: #4a3410; color: #ffe2a8; border: 1px solid #7a5a1c; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
+.banner { background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-edge); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
 
 /* ---------- Today's Games ---------- */
 .demo-button {
-  display: block; text-decoration: none; background: var(--accent); color: #1a1405;
+  display: block; text-decoration: none; background: var(--accent); color: var(--on-accent);
   font-weight: 800; padding: 14px; border-radius: var(--radius); margin-bottom: 14px;
 }
 .demo-button small { display: block; font-weight: 500; opacity: 0.8; }
@@ -101,7 +162,7 @@ h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: 0.04em; text-transform: u
 .meter { text-align: center; padding: 18px 14px 16px; border-width: 2px; transition: box-shadow 0.3s, border-color 0.3s; }
 .meter-number { font-size: 84px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .meter-label { font-size: 17px; font-weight: 600; margin-top: 6px; }
-.meter-times { color: var(--accent); font-weight: 700; margin-top: 6px; min-height: 1.4em; }
+.meter-times { color: var(--accent-text); font-weight: 700; margin-top: 6px; min-height: 1.4em; }
 .meter-ref { color: var(--muted); font-size: 14px; margin-top: 6px; }
 .meter-updated { color: var(--muted); font-size: 13px; margin-top: 2px; }
 .estimate { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--muted); color: var(--muted); vertical-align: middle; text-transform: uppercase; }
@@ -109,7 +170,7 @@ h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: 0.04em; text-transform: u
 /* Spike: the glow pulses. The pulse is turned off for people who asked for less motion,
    but they still get the static glow. */
 .meter.spike { border-color: var(--spike); box-shadow: 0 0 22px 2px rgba(255, 122, 26, 0.55); animation: pulse 1.2s ease-in-out infinite; }
-.meter.spike .meter-number { color: #ffd2a8; text-shadow: 0 0 18px rgba(255, 122, 26, 0.8); }
+.meter.spike .meter-number { color: var(--spike-text); text-shadow: 0 0 18px rgba(255, 122, 26, 0.8); }
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 14px 0 rgba(255, 122, 26, 0.35); }
   50% { box-shadow: 0 0 34px 8px rgba(255, 122, 26, 0.85); }
@@ -132,8 +193,8 @@ h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: 0.04em; text-transform: u
 .hist-result { font-size: 14px; text-align: right; }
 .hist-pred { font-weight: 800; text-align: right; min-width: 44px; font-variant-numeric: tabular-nums; }
 .hist-pred small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
-.hist-row.hr { background: #3a2a08; outline: 2px solid var(--accent); }
-.hist-result.hr { color: var(--accent); font-weight: 800; }
+.hist-row.hr { background: var(--hr-bg); outline: 2px solid var(--accent); }
+.hist-result.hr { color: var(--accent-text); font-weight: 800; }
 
 /* ---------- Demo controls ---------- */
 .demo-bar { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px dashed var(--accent); border-radius: 10px; padding: 8px 10px; margin-bottom: 12px; font-weight: 700; font-size: 14px; }
@@ -263,7 +324,7 @@ kbd { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; b
 /* anything with a mouse: hover feedback and a pointer cursor */
 @media (hover: hover) and (pointer: fine) {
   button, .game-card, .demo-button, .hist-row, .why-row, .count-cell { cursor: pointer; }
-  .game-card:hover { border-color: var(--accent); background: #212837; }
+  .game-card:hover { border-color: var(--accent); background: var(--card-hover); }
   .demo-button:hover { background: #ffdb70; }
   button:hover { background: var(--card-edge); }
   .hist-row:hover { filter: brightness(1.25); }
@@ -281,14 +342,25 @@ kbd { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; b
 @media (prefers-reduced-motion: reduce) { .scene .hit-ball { display: none; } }
 
 /* ---------- Strike zone card ---------- */
-.zone-svg { width: 100%; max-width: 360px; display: block; margin: 8px auto; background: #141a24; border-radius: 10px; }
-.zone-box { fill: rgba(255, 255, 255, 0.04); stroke: #f2f4f8; stroke-width: 2; }
-.zone-shadow { fill: none; stroke: #6b7587; stroke-width: 1; stroke-dasharray: 4 4; }
-.zone-grid line { stroke: rgba(255, 255, 255, 0.25); stroke-width: 1; }
-.zone-plate { fill: #e8e8e8; stroke: #8a8f99; stroke-width: 1; }
+.zone-svg { width: 100%; max-width: 360px; display: block; margin: 8px auto; background: var(--zone-bg); border-radius: 10px; }
+.zone-box { fill: var(--text); fill-opacity: 0.05; stroke: var(--text); stroke-width: 2; }
+.zone-shadow { fill: none; stroke: var(--zone-dash); stroke-width: 1; stroke-dasharray: 4 4; }
+.zone-grid line { stroke: var(--text); stroke-opacity: 0.25; stroke-width: 1; }
+.zone-plate { fill: var(--zone-plate); stroke: var(--muted); stroke-width: 1; }
 .zone-pitch { cursor: pointer; }
 .zone-pitch text { font: 700 12px -apple-system, "Segoe UI", sans-serif; fill: #10131a; pointer-events: none; }
 .zone-pitch.latest circle { stroke: #fff; stroke-width: 2.5; }
 .zone-detail { margin: 6px 0; text-align: center; }
 .zone-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; font-size: 12px; color: var(--muted); margin: 6px 0; }
 .zone-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+
+/* ---------- Theme picker ---------- */
+.header-right { display: flex; align-items: center; gap: 10px; }
+.theme-btn { min-height: 32px; padding: 4px 10px; font-size: 12px; border-radius: 99px; background: var(--card); color: var(--muted); }
+.theme-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 8px; }
+.theme-swatch { display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; background: var(--bg); border: 2px solid var(--card-edge); border-radius: 10px; color: var(--text); font-weight: 600; }
+.theme-swatch.on { border-color: var(--accent); }
+.swatch-dots { display: inline-flex; }
+.swatch-dots i { width: 14px; height: 22px; border: 1px solid rgba(128, 128, 128, 0.6); margin-right: -3px; }
+.swatch-dots i:first-child { border-radius: 6px 0 0 6px; }
+.swatch-dots i:last-child { border-radius: 0 6px 6px 0; margin-right: 0; }

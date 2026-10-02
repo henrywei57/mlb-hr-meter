@@ -37,6 +37,13 @@ export function localDateString(date = new Date()) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+// MLB dates its schedule by US Eastern time, not the user's time zone. Someone in Asia or Europe
+// would otherwise ask for "tomorrow" and miss games that are live right now.
+export function mlbDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  return parts; // en-CA formats as YYYY-MM-DD
+}
+
 // localStorage can throw (private mode, storage full), so every use goes through these.
 export function saveLocal(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }

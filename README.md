@@ -15,7 +15,7 @@ You need [Node.js](https://nodejs.org) (any recent version).
 
 ```bash
 npm start          # serves the app at http://localhost:8080
-npm test           # runs the unit tests (model + game-state logic)
+npm test           # runs the unit tests (model, game state, 3D data, Matchup Lab)
 ```
 
 Open `http://localhost:8080` in a browser. Use `localhost`, not a file path: service workers only run on `localhost` or HTTPS. No Node? `python -m http.server 8080` in this folder also works.
@@ -39,28 +39,36 @@ After changing code, push again. If you **add a new file** that should work offl
 
 To pick up a new version, close the app fully and reopen it while online.
 
-## Phone and computer
+## What's in the app
 
-One layout that adapts to the screen:
+**Screens:** Today's Games (home), the game screen (live game or the Demo), and the Matchup Lab.
+
+### The 3D stadium (game screen)
+A real 3D scene, drawn with [Three.js](https://threejs.org) (a copy is in `public/vendor/`, MIT license, so it works offline). It shows the field from behind home plate, with the strike zone, the pitcher and the batter wearing their team colors and their **real MLB headshots**.
+- **Look around:** drag to orbit, scroll or pinch to zoom, double-tap to reset. Buttons jump to **Catcher, Side, Pitcher, Center field and Overhead** views.
+- **Reacts to the count:** in a hitter's count (2-0, 2-1, 3-1) the batter stands wide with the bat cocked and the pitcher sweats; in a pitcher's count (0-2, 1-2) the pitcher stands tall and the batter chokes up and crouches; a full count makes both tense. A ring under each player shows who has the edge (green), who is under pressure (orange) or neither (white), with a small label.
+- **Real pitches:** each pitch flies along MLB's own tracking of that pitch (release point, speed and break), slowed down so you can follow it, and a **speed gun** shows its speed and type. The pitches of the at-bat sit in the strike zone as colored balls. Tap a pitch in the Strike zone card to throw it again in 3D.
+- **Hit replay:** when an at-bat ends in a single, double, triple or home run, the scene replays it: the pitch, the **bat swing**, and the **ball flying out** at its real launch angle, in its real direction and for its real distance, with the camera following it. A home run clears the wall and shows its distance and exit speed.
+- **Handedness always matches the data:** from behind the plate, a **right-handed batter stands on the viewer's left and a lefty on the right**, and a **right-handed pitcher holds the ball on the viewer's left** and a lefty on the right.
+- **Snapshot** saves a PNG of the scene. **Replay pitch / Replay last hit** repeat what you just saw.
+- If a browser can't do 3D (or you tap **Switch to 2D**), a flat 2D version of the scene is used instead (`src/ui/scene.js`).
+
+### Themes
+Five themes: **Night, Day, Ballpark, Scoreboard** (amber on black) and **High contrast**. Pick one in Settings on the home screen, or tap the Theme button at the top of a game to cycle. The 3D stadium follows the theme (sky, grass and lighting). To add a theme, copy a block in `styles.css` and change its colors, then add it to `THEMES` in `src/theme.js`.
+
+### Matchup Lab (`#/lab`)
+Pick **any** batter and **any** pitcher, a ballpark and a count, and see the home run chance, strikeout chance and expected total bases against the league average, plus the "Why" breakdown. Includes ready-made dream matchups, a Surprise me button, and a **share link** (the matchup is in the address).
+
+### Other touches
+- **Two smaller meters** under the home run meter: **Expected total bases** and **Strikeout chance**.
+- **Tap a "Why" line** for a plain-English explanation; **Try another count** shows the chance at every count; **tap a history row** for the play-by-play.
+- **Sound effects** (off by default; Settings): the crack of the bat and a crowd cheer on hits, made in the browser.
+- **Settings:** theme, glow-and-buzz threshold (1.5x to 4x), sound, vibration.
+
+### Phone and computer
 - **Phone (under 640 px):** a single column, big tap targets, safe-area padding for the iPhone notch. Designed for 360 px wide.
-- **Tablet (640 px and up):** the same column, a little wider.
-- **Computer (960 px and up):** a two-column dashboard. The game screen puts the score, scene, meters and calls on the left and the "Why" list, count what-if grid and history on the right. Today's Games becomes a grid of cards, and My calls puts your stats beside the list.
-- **Mouse:** hover highlights and pointer cursors.
-- **Keyboard (computer):** <kbd>Space</kbd> pauses or resumes the demo. History rows and every button work with Tab and Enter.
-
-The layout rules are the last section of `styles.css`.
-
-## Interactive features
-
-- **Matchup scene:** the pitcher and batter with their **real MLB headshots** (loaded from MLB's image server by player id; if a photo can't load, a plain cartoon face shows instead), in team-color uniforms, reacting to the count. In a hitter's count (2-0, 2-1, 3-1) the batter swings loose and the pitcher sweats; in a pitcher's count (0-2, 1-2) the pitcher looks confident and the batter chokes up; a full count makes both tense. A ring around each photo shows who has the edge (green), who is under pressure (orange) or neither (white), with a small label. A ball is thrown whenever the count changes.
-- **Hit replay:** when an at-bat ends in a single, double, triple or home run, the scene replays it: the pitch comes in, the **bat swings**, and the **ball flies out**. The flight uses the real batted-ball data from MLB's feed (distance, launch angle and where it landed), so a ball hit to left field goes to the left. Home runs fly out of the park and show the distance and exit speed.
-- **Handedness always matches the data.** The scene uses the catcher's view from behind home plate: a **right-handed batter stands on the viewer's left of the plate and a lefty on the right**, with the bat held away from the plate. The pitcher faces you, so a **right-handed pitcher holds the ball on the viewer's left** and a lefty on the right. Code: `src/ui/scene.js`.
-- **Two smaller meters** under the home run meter: **Expected total bases** (single = 1, double = 2, triple = 3, home run = 4) and **Strikeout chance**. They use the same recipe as the home run number: league average, then batter, pitcher, lefty/righty, count and park.
-- **Tap a "Why" line** for a plain-English explanation of that factor.
-- **Try another count**: a grid showing the chance at every count for the current batter and pitcher; tap one for a what-if.
-- **Tap a history row** to read the play-by-play.
-- **Settings** (home screen): choose the spike threshold (1.5x to 4x) and turn vibration on or off.
-
+- **Computer (960 px and up):** a two-column dashboard (the 3D stage and score on the left; the home run meter, strike zone, "Why" and history on the right). Today's Games becomes a grid of cards.
+- **Mouse** hover highlights; **keyboard:** <kbd>Space</kbd> pauses or resumes the demo, and everything works with Tab and Enter.
 
 ## How it works
 
@@ -68,21 +76,24 @@ The layout rules are the last section of `styles.css`.
 index.html, styles.css, manifest.webmanifest, sw.js   the app shell + install/offline support
 src/
   config.js      <- settings you'll edit: SPIKE_MULTIPLE, POLL_MS, DEMO_STEP_MS
-  settings.js    saved user preferences
-  model.js       the home-run math (pure function, unit tested, commented step by step)
+  settings.js    saved user preferences       theme.js  themes       audio.js  sound effects
+  model.js       the home-run (and K, total bases) math: pure, unit tested, commented step by step
   gamestate.js   turns MLB's giant feed JSON into one small "game state" object
   sources.js     liveSource (polls MLB) and demoSource (replays a saved game)
   api.js         all network calls
-  ui/            home.js (Today's Games), game.js (game screen), scene.js (batter/pitcher cartoon), why.js, diamond.js
+  ui/            home.js (Today's Games), game.js (game screen), lab.js (Matchup Lab),
+                 stage.js (picks 3D or 2D), scene3d.js (the 3D stadium), scene.js (2D fallback),
+                 zone.js (strike zone), why.js, diamond.js, gl.js
 public/
-  data/rates.json         precomputed rates (made by scripts/build_rates.py)
+  data/rates.json         precomputed rates and names (made by scripts/build_rates.py)
   data/demo_game.json     saved playoff game for Demo mode
   data/team-colors.json   team ID -> color (edit freely)
+  vendor/three.module.min.js   Three.js (MIT)
 scripts/         build_rates.py, build_demo.py, make_icons.py, serve.js
-tests/           model.test.js, gamestate.test.js
+tests/           model, gamestate, scene, lab
 ```
 
-The app never calls pybaseball. It only reads `rates.json`. (It holds home run, strikeout and total-bases rates for every player, which is why it's about 670 KB.)
+The app never calls pybaseball. It only reads `rates.json`. (It holds home run, strikeout and total-bases rates, plus names, for every player, which is why it's about 600 KB.)
 
 ### The model (`src/model.js`)
 
@@ -153,6 +164,15 @@ With 0 PA in a split you get exactly the prior (the "fall back to overall" rule)
 14. **Phone data use:** each poll downloads the whole game feed, about 130 KB compressed. At one poll every 7 seconds that's roughly 65 MB per hour. Cutting this (the API's `fields` filter or diff endpoint) is a good next step.
 15. **Not tested on a real iPhone**, and not yet on a *live* game (none was on when I built this). Live-mode parsing was tested by feeding it a trimmed copy of the demo game made to look mid-game; the "between batters" branch and unusual statuses (delays, warm-up) are untested. `navigator.vibrate` does nothing on iPhone by design, so there you only get the glow.
 16. **CORS:** the MLB API sends `Access-Control-Allow-Origin: *`, so browsers can call it directly and **no Cloudflare Worker proxy is needed**.
+
+**3D scene**
+
+- **It's a diorama, not a simulation.** Players are built from simple shapes and drawn larger than life (the pitcher especially) so they read on a phone. Stances and the swing are generic poses, not each player's real mechanics. There are no fielders or baserunners.
+- **Pitches are real, but slowed down** about 3x so you can follow them. The path comes from MLB's tracking of the pitch; the markers in the strike zone are where MLB says it crossed the front of the plate (a unit test checks that the path really ends there).
+- **Batted balls use the real launch angle, direction and distance**, but the flight is a simple arc between those numbers (not full physics with spin and air resistance), and the replay is slowed down. Ground balls just skip along the grass. If MLB has no batted-ball data for a hit, a typical flight for that kind of hit is used.
+- **The stadium is generic.** The wall is 330 ft down the lines and 385 ft in center in every park; it is not each park's real shape. The theme sets the lighting, not the real time of day.
+- **Performance:** the 3D library (about 670 KB) only loads on the game screen, and drawing stops when the scene is off screen. Older phones may run it slowly; **Switch to 2D** is one tap. Not tested on a real iPhone.
+- **Sound** is synthesized, so it is a simple imitation, not a recording. It stays silent until you switch it on in Settings and tap the screen once.
 
 ## How far behind the MLB feed is the app?
 

@@ -10,11 +10,14 @@ import { showHome } from "./ui/home.js";
 import { showGame } from "./ui/game.js";
 import { showLab } from "./ui/lab.js";
 import { applyTheme } from "./theme.js";
+import { unlockAudio } from "./audio.js";
 
 // An earlier version saved "calls" on the device. That feature is gone, so tidy the leftovers.
 try { localStorage.removeItem("hr:calls"); } catch { /* storage unavailable: nothing to clean */ }
 
 applyTheme(); // the saved theme (or Night)
+// Browsers only allow sound after a tap, so the sound engine wakes up on the first one.
+for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, unlockAudio, { passive: true });
 
 const app = document.getElementById("app");
 let leaveScreen = null; // cleanup function of the screen currently shown (stops timers / polling)

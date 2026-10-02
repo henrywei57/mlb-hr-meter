@@ -10,6 +10,7 @@
 import { getSettings, saveSettings } from "../settings.js";
 import { teamColor, esc, pct } from "../util.js";
 import { countMood, sceneHtml, resultSceneHtml, playResult } from "./scene.js";
+import { playCrack, playCheer } from "../audio.js";
 import { webglAvailable } from "./gl.js";
 
 // The camera views (their positions live in scene3d.js; this is just the buttons)
@@ -29,6 +30,20 @@ export function createStage(host, { colors }) {
 
   // 3D bookkeeping
   let lastAtBat = null, lastPitchCount = 0, lastPitch = null, lastHit = null;
+  let currentPitches = [];      // the pitches of the at-bat on screen (for "replay this pitch")
+  let chipTimer = null;
+
+  // The "speed gun": a little readout of the pitch's speed and type when it is thrown.
+  function showPitchChip(pitch) {
+    const chip = host.querySelector(".pitch-chip");
+    if (!chip || !pitch) return;
+    const parts = [pitch.speed ? `${pitch.speed.toFixed(1)} mph` : null, pitch.type || null].filter(Boolean);
+    if (!parts.length) return;
+    chip.textContent = parts.join("  ·  ");
+    chip.hidden = false;
+    clearTimeout(chipTimer);
+    chipTimer = setTimeout(() => { chip.hidden = true; }, 3200);
+  }
 
   const wantsThree = () => getSettings().visual !== "2d" && webglAvailable();
 
@@ -45,6 +60,7 @@ export function createStage(host, { colors }) {
           <div class="stage-canvas-host"></div>
           <div class="stage-hud" aria-hidden="true"></div>
           <div class="stage-banner" hidden></div>
+          <div class="pitch-chip" hidden></div>
         </div>
         <div class="stage-controls" role="toolbar" aria-label="Camera and tools">
           ${VIEW_BUTTONS.map(([k, label]) => `<button type="button" class="chip-btn" data-view="${k}">${label}</button>`).join("")}
@@ -78,7 +94,9 @@ export function createStage(host, { colors }) {
           el.className = "stage-banner" + (big ? " big" : "");
           el.innerHTML = `<b>${esc(title)}</b>${detail ? `<span>${esc(detail)}</span>` : ""}`;
           el.hidden = false;
+          playCheer(!!big);
         },
+        onContact: () => playCrack(),
         onBannerHide: () => { const el = host.querySelector(".stage-banner"); if (el) el.hidden = true; },
         onHitDone: () => { busyUntil = 0; if (state) update(state); },
       });
@@ -127,7 +145,8 @@ export function createStage(host, { colors }) {
       stage3d.setZone(pitches, withZone?.top ?? 3.4, withZone?.bottom ?? 1.6);
       // a new pitch since last time in this at-bat: throw it
       const key = `${s.current.batter.id}|${s.current.atBatIndex}`;
-      if (key === lastAtBat && pitches.length > lastPitchCount) { lastPitch = pitches[pitches.length - 1]; stage3d.throwPitch(lastPitch); }
+      currentPitches = pitches;
+      if (key === lastAtBat && pitches.length > lastPitchCount) { lastPitch = pitches[pitches.length - 1]; stage3d.throwPitch(lastPitch); showPitchChip(lastPitch); }
       else if (key !== lastAtBat) lastPitch = pitches[pitches.length - 1] || null;
       lastAtBat = key; lastPitchCount = pitches.length;
       host.querySelector(".stage-hud").innerHTML =
@@ -163,7 +182,9 @@ export function createStage(host, { colors }) {
       busyUntil = Date.now() + stage3d.playHit(info) + 400;
       return;
     }
-    // 2D replay
+    // 2D replay (the sounds are timed by hand here)
+    setTimeout(playCrack, 880);
+    setTimeout(() => playCheer(row.hit.event === "home_run"), 1750);
     const replay = resultSceneHtml({ ...info, balls: 0, strikes: 0, outs: s.outs });
     const el = host.querySelector(".flat-scene");
     el.innerHTML = replay.html;
@@ -187,7 +208,7 @@ export function createStage(host, { colors }) {
       if (mode === "3d") { build("2d"); if (state) update(state); }
       else if (webglAvailable()) { build("2d"); start3d(); }
     } else if (action === "pitch" && stage3d && lastPitch) {
-      stage3d.throwPitch(lastPitch);
+      stage3d.throwPitch(lastPitch); showPitchChip(lastPitch);
     } else if (action === "hit" && stage3d && lastHit) {
       busyUntil = Date.now() + stage3d.playHit(lastHit) + 400;
     } else if (action === "snap" && stage3d) {
@@ -205,13 +226,21 @@ export function createStage(host, { colors }) {
   const onTheme = () => stage3d?.refreshTheme();
   window.addEventListener("themechange", onTheme);
 
+  // Replay one pitch of the current at-bat (tapped in the strike-zone card) in the 3D scene.
+  function replayPitch(n) {
+    const pitch = currentPitches.find((p) => p.n === n);
+    if (!pitch || !stage3d) return;
+    stage3d.throwPitch(pitch);
+    showPitchChip(pitch);
+  }
+
   const api = {
-    update, hit,
+    update, hit, replayPitch,
     get stage3d() { return stage3d; },
     get mode() { return mode; },
     dispose() {
       disposed = true;
-      clearTimeout(busyTimer);
+      clearTimeout(busyTimer); clearTimeout(chipTimer);
       host.removeEventListener("click", onClick);
       window.removeEventListener("themechange", onTheme);
       stage3d?.dispose();

@@ -68,6 +68,7 @@ export function showHome(root) {
           ${[1.5, 2, 3, 4].map((m) => `<option value="${m}" ${getSettings().spikeMultiple === m ? "selected" : ""}>${m}x the league average</option>`).join("")}
         </select>
       </label>
+      <label class="check setting"><input type="checkbox" id="sound-toggle" ${getSettings().sound ? "checked" : ""}> Sound effects (bat crack and crowd cheer on hits)</label>
       <label class="check setting"><input type="checkbox" id="vibrate-toggle" ${getSettings().vibrate ? "checked" : ""}> Vibrate (Android only; iPhone doesn't support it)</label>
     </details>
     <div id="notice" class="banner" hidden></div>
@@ -83,6 +84,7 @@ export function showHome(root) {
     }
   });
   root.querySelector("#spike-select").addEventListener("change", (e) => saveSettings({ spikeMultiple: Number(e.target.value) }));
+  root.querySelector("#sound-toggle").addEventListener("change", (e) => saveSettings({ sound: e.target.checked }));
   root.querySelector("#vibrate-toggle").addEventListener("change", (e) => saveSettings({ vibrate: e.target.checked }));
   const gamesEl = root.querySelector("#games");
   const noticeEl = root.querySelector("#notice");

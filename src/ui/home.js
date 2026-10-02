@@ -1,7 +1,7 @@
 // Screen 1: Today's Games. Live games first, then upcoming, then finished.
 
 import { fetchSchedule } from "../api.js";
-import { esc, localDateString, saveLocal, loadLocal } from "../util.js";
+import { esc, mlbDateString, saveLocal, loadLocal } from "../util.js";
 import { getSettings, saveSettings } from "../settings.js";
 import { loadCalls, computeStats } from "../calls.js";
 
@@ -46,7 +46,8 @@ function gameCard({ game, status }) {
 }
 
 export function showHome(root) {
-  const today = localDateString();
+  const today = mlbDateString();
+  const yesterday = mlbDateString(new Date(Date.now() - 24 * 3600 * 1000));
   const cacheKey = `hr:schedule:${today}`;
   let timer = null;
   let stopped = false;
@@ -81,7 +82,10 @@ export function showHome(root) {
   async function refresh() {
     clearTimeout(timer);
     try {
-      const games = await fetchSchedule(today);
+      // Also load yesterday's slate: late games can still be live after midnight Eastern.
+      const [todays, earlier] = await Promise.all([fetchSchedule(today), fetchSchedule(yesterday).catch(() => [])]);
+      const seen = new Set(todays.map((g) => g.gamePk));
+      const games = todays.concat(earlier.filter((g) => g.status.abstractGameState === "Live" && !seen.has(g.gamePk)));
       if (stopped) return;
       saveLocal(cacheKey, games);
       noticeEl.hidden = true;

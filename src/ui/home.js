@@ -3,7 +3,6 @@
 import { fetchSchedule } from "../api.js";
 import { esc, mlbDateString, saveLocal, loadLocal } from "../util.js";
 import { getSettings, saveSettings } from "../settings.js";
-import { loadCalls, computeStats } from "../calls.js";
 
 const REFRESH_MS = 30000;
 
@@ -18,11 +17,6 @@ function statusInfo(game) {
   const time = new Date(game.gameDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const odd = ["Postponed", "Suspended", "Cancelled"].includes(game.status.detailedState);
   return { rank: 1, text: odd ? game.status.detailedState : time, kind: "upcoming" };
-}
-
-function callsSummary() {
-  const s = computeStats(loadCalls());
-  return s.total ? `${s.hits} of ${s.total} called right · ${s.points} pts` : "call a homer before an at-bat and track your record";
 }
 
 function sortGames(games) {
@@ -56,7 +50,6 @@ export function showHome(root) {
     <header class="top"><h1>Today's Games</h1></header>
     <div class="actions">
       <a class="demo-button" href="#/demo">Demo game <small>replay a real playoff game with 4 home runs</small></a>
-      <a class="calls-button" href="#/calls">My calls <small>${callsSummary()}</small></a>
     </div>
     <details class="card settings">
       <summary>Settings</summary>

@@ -2,13 +2,14 @@
 //   #/            -> Today's Games
 //   #/game/12345  -> live game with that gamePk
 //   #/demo        -> replay of the saved demo game
-//   #/calls       -> your home run calls and stats
 
 import { loadRates, loadTeamColors } from "./api.js";
 import { liveSource, demoSource } from "./sources.js";
 import { showHome } from "./ui/home.js";
 import { showGame } from "./ui/game.js";
-import { showCalls } from "./ui/calls.js";
+
+// An earlier version saved "calls" on the device. That feature is gone, so tidy the leftovers.
+try { localStorage.removeItem("hr:calls"); } catch { /* storage unavailable: nothing to clean */ }
 
 const app = document.getElementById("app");
 let leaveScreen = null; // cleanup function of the screen currently shown (stops timers / polling)
@@ -37,11 +38,6 @@ async function route() {
   const hash = location.hash || "#/";
   const game = hash.match(/^#\/game\/(\d+)$/);
   const isDemo = hash === "#/demo";
-
-  if (hash === "#/calls") {
-    leaveScreen = showCalls(freshScreen());
-    return;
-  }
 
   if (!game && !isDemo) {
     leaveScreen = showHome(freshScreen());

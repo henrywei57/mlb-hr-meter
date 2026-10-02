@@ -36,11 +36,11 @@ export function countMood(balls, strikes) {
 
 // The little label by each player's head, and the color of the ring around his photo
 // (green = has the edge, orange = under pressure, white = even).
-const TAGS = {
+export const TAGS = {
   batter: { aggressive: "Aggressive", ready: "Ready", defensive: "Protecting", patient: "Patient", tense: "Tense" },
   pitcher: { confident: "Confident", neutral: "Steady", worried: "Pressured", tense: "Tense" },
 };
-const RING = {
+export const RING = {
   aggressive: "#4bd37b", patient: "#4bd37b", confident: "#4bd37b",
   ready: "#ffffff", neutral: "#ffffff", defensive: "#7fb8ff",
   worried: "#ffb14a", tense: "#ffb14a",

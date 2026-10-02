@@ -55,3 +55,33 @@ test("a finished game read as a live feed has no current at-bat", () => {
   assert.equal(s.current, null);
   assert.equal(s.history.length, frames.length);
 });
+
+// ---- 3D data: MLB's pitch tracking and the pitch that ended each at-bat ----
+test("pitches carry MLB's tracking path, and finished at-bats remember their last pitch", () => {
+  const s = demoStateAt(feed, frames, 1);
+  const withPath = s.history.flatMap((r) => (r.lastPitch ? [r.lastPitch] : [])).filter((p) => p.path);
+  assert.ok(withPath.length > 0);
+  const p = withPath[0].path;
+  for (const key of ["x0", "y0", "z0", "vX0", "vY0", "vZ0", "aX", "aY", "aZ", "plateTime"]) assert.ok(Number.isFinite(p[key]), key);
+  assert.ok(p.y0 > 40 && p.y0 < 60); // the tracking starts about 50 ft from the plate
+  assert.ok(p.plateTime > 0.3 && p.plateTime < 0.6); // and takes roughly 0.4 s to arrive
+});
+
+test("a pitch's tracked path crosses the front of the plate exactly where MLB says it did", () => {
+  const rows = demoStateAt(feed, frames, frames.length).history.filter((r) => r.lastPitch?.path && Number.isFinite(r.lastPitch.x));
+  assert.ok(rows.length > 20);
+  for (const { lastPitch: { path: c, x, z } } of rows) {
+    const at = (t) => ({
+      x: c.x0 + c.vX0 * t + 0.5 * c.aX * t * t,
+      y: c.y0 + c.vY0 * t + 0.5 * c.aY * t * t,   // distance from the plate, in feet
+      z: c.z0 + c.vZ0 * t + 0.5 * c.aZ * t * t,   // height, in feet
+    });
+    // find the moment the ball is 17 inches from the plate's tip (the front edge, where MLB measures)
+    let lo = 0, hi = c.plateTime;
+    for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (at(mid).y > 17 / 12) lo = mid; else hi = mid; }
+    const p = at(lo);
+    assert.ok(Math.abs(p.x - x) < 0.05 && Math.abs(p.z - z) < 0.05, `path (${p.x.toFixed(2)}, ${p.z.toFixed(2)}) vs MLB (${x}, ${z})`);
+    // plateTime is when it reaches the catcher's mitt, a couple of feet behind the plate
+    assert.ok(at(c.plateTime).y < 0 && at(c.plateTime).y > -3);
+  }
+});

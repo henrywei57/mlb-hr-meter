@@ -64,6 +64,12 @@ function teamInfo(gameTeam, score) {
 // The pitches of a plate appearance, with where each crossed the plate (feet; pX is measured from
 // the catcher's view, positive = toward his right) and the batter's own zone top and bottom.
 // `limit` keeps only the first N pitches (the demo replays an at-bat part way through).
+function pathOf(pitchData) {
+  const c = pitchData?.coordinates;
+  if (!c || ![c.x0, c.y0, c.z0, c.vX0, c.vY0, c.vZ0, c.aX, c.aY, c.aZ].every(Number.isFinite)) return null;
+  return { x0: c.x0, y0: c.y0, z0: c.z0, vX0: c.vX0, vY0: c.vY0, vZ0: c.vZ0, aX: c.aX, aY: c.aY, aZ: c.aZ, plateTime: pitchData.plateTime };
+}
+
 export function pitchesOf(play, limit = Infinity) {
   return (play?.playEvents || [])
     .filter((e) => e.isPitch)
@@ -79,6 +85,8 @@ export function pitchesOf(play, limit = Infinity) {
       call: e.details?.call?.description || e.details?.description,
       code: e.details?.code,
       inPlay: !!e.details?.isInPlay,
+      // MLB's tracking of the pitch's flight (feet, seconds), used to fly the ball in 3D
+      path: pathOf(e.pitchData),
     }));
 }
 
@@ -97,6 +105,7 @@ function historyRow(play, venueId) {
     isK: (play.result.eventType || "").startsWith("strikeout"),
     bases: BASES_BY_EVENT[play.result.eventType] || 0, // total bases the batter got
     hit: hitDetails(play),
+    lastPitch: pitchesOf(play).slice(-1)[0] || null, // the pitch that ended the at-bat
     // The history shows the chance BEFORE the first pitch, so every row is judged at 0-0.
     situation: {
       batterId: String(play.matchup.batter.id),

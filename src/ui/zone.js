@@ -25,7 +25,7 @@ function look(pitch) {
   }
 }
 
-export function zoneHtml(pitches, openPitch) {
+export function zoneHtml(pitches, openPitch, actions) {
   const shown = (pitches || []).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.z));
   const last = pitches?.find((p) => Number.isFinite(p.top));
   const top = last?.top ?? 3.4, bottom = last?.bottom ?? 1.6; // average zone if MLB hasn't measured one yet
@@ -64,6 +64,7 @@ export function zoneHtml(pitches, openPitch) {
       ${plate}${dots}
     </svg>
     ${detail}
+    ${picked && actions ? actions(picked) : ""}
     <p class="zone-legend"><i style="background:#ff5b6e"></i>Called strike <i style="background:#ff9d4d"></i>Swinging <i style="background:#ffcf4a"></i>Foul <i style="background:#6cb4ff"></i>Ball <i style="background:#fff"></i>In play</p>
     <p class="note">Catcher's view. The box is this batter's real zone; the dashed edge is one ball width outside it. Tap a pitch for details.</p>`;
 }

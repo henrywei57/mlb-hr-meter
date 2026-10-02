@@ -1,6 +1,6 @@
 # HR Meter (prototype)
 
-A phone-first web app that shows **one number** while you watch an MLB game: *"Home run chance, this at-bat: 9%"*.
+A phone-first web app for the MLB game you're watching. The big number is **win probability** (for example *White Sox 62% - Astros 38%*), with the home run chance, strikeout chance and expected total bases beside it, a 3D view of the at-bat, and a way to find, replay and save any pitch.
 It's an installable PWA (Progressive Web App), so it can live on an iPhone home screen.
 
 **Framework choice:** plain JavaScript (ES modules), no framework and no build step, because you can read every line, edit it in place, and host it as static files.
@@ -43,11 +43,20 @@ To pick up a new version, close the app fully and reopen it while online.
 
 **Screens:** Today's Games (home), the game screen (live game or the Demo), and the Matchup Lab.
 
+### Win probability (the big number)
+The card right under the score shows each team's chance to win, as two big percentages, a tug-of-war bar in the team colors, and a **chart of how the game has swung** play by play (the home team's chance, shaded in the team that is ahead, with the innings marked). The numbers come from **MLB's own win probability model**, not ours, so they match what MLB's app shows. They depend on the inning, outs, runners and score.
+
+### Pitch finder and saved pitches
+- **Pitch finder** (game screen): every pitch of the game, **grouped by inning** (Top 1st, Bot 1st...). Open an inning to see each at-bat and each pitch with its count, type, speed and what happened. Filter by **Strikes, Balls, In play or the Fastest 10**.
+- **Replay:** tap **Replay** on any pitch and the 3D scene puts that at-bat's pitcher and batter on the field and throws it again, drawing the pitch's **flight path** as a glowing line (red = fastballs, blue = breaking balls, green = changeups and splitters).
+- **Save:** tap **Save** on a pitch (in the finder, or in the Strike zone card) to keep it. Saved pitches live in **Saved pitches** (button on the home screen): grouped by game and inning, replayable in 3D with the flight path, and removable. Each saved pitch stores everything needed to replay it, so it works offline and after the game is over. They are saved on this device only.
+
 ### The 3D stadium (game screen)
 A real 3D scene, drawn with [Three.js](https://threejs.org) (a copy is in `public/vendor/`, MIT license, so it works offline). It shows the field from behind home plate, with the strike zone, the pitcher and the batter wearing their team colors and their **real MLB headshots**.
 - **Look around:** drag to orbit, scroll or pinch to zoom, double-tap to reset. Buttons jump to **Catcher, Side, Pitcher, Center field and Overhead** views.
 - **Reacts to the count:** in a hitter's count (2-0, 2-1, 3-1) the batter stands wide with the bat cocked and the pitcher sweats; in a pitcher's count (0-2, 1-2) the pitcher stands tall and the batter chokes up and crouches; a full count makes both tense. A ring under each player shows who has the edge (green), who is under pressure (orange) or neither (white), with a small label.
 - **Real pitches:** each pitch flies along MLB's own tracking of that pitch (release point, speed and break), slowed down so you can follow it, and a **speed gun** shows its speed and type. The pitches of the at-bat sit in the strike zone as colored balls. Tap a pitch in the Strike zone card to throw it again in 3D.
+- **Flight paths:** a replayed pitch draws its whole route as a glowing line, and a hit draws the ball's arc, so you can see the break of a slider or the arc of a home run, not just the ball.
 - **Hit replay:** when an at-bat ends in a single, double, triple or home run, the scene replays it: the pitch, the **bat swing**, and the **ball flying out** at its real launch angle, in its real direction and for its real distance, with the camera following it. A home run clears the wall and shows its distance and exit speed.
 - **Handedness always matches the data:** from behind the plate, a **right-handed batter stands on the viewer's left and a lefty on the right**, and a **right-handed pitcher holds the ball on the viewer's left** and a lefty on the right.
 - **Snapshot** saves a PNG of the scene. **Replay pitch / Replay last hit** repeat what you just saw.
@@ -60,14 +69,14 @@ Five themes: **Night, Day, Ballpark, Scoreboard** (amber on black) and **High co
 Pick **any** batter and **any** pitcher, a ballpark and a count, and see the home run chance, strikeout chance and expected total bases against the league average, plus the "Why" breakdown. Includes ready-made dream matchups, a Surprise me button, and a **share link** (the matchup is in the address).
 
 ### Other touches
-- **Two smaller meters** under the home run meter: **Expected total bases** and **Strikeout chance**.
+- **Three small tiles** under the matchup: **Home run chance** (glows on a spike), **Expected total bases** and **Strikeout chance**.
 - **Tap a "Why" line** for a plain-English explanation; **Try another count** shows the chance at every count; **tap a history row** for the play-by-play.
 - **Sound effects** (off by default; Settings): the crack of the bat and a crowd cheer on hits, made in the browser.
 - **Settings:** theme, glow-and-buzz threshold (1.5x to 4x), sound, vibration.
 
 ### Phone and computer
 - **Phone (under 640 px):** a single column, big tap targets, safe-area padding for the iPhone notch. Designed for 360 px wide.
-- **Computer (960 px and up):** a two-column dashboard (the 3D stage and score on the left; the home run meter, strike zone, "Why" and history on the right). Today's Games becomes a grid of cards.
+- **Computer (960 px and up):** a two-column dashboard (the 3D stage and score on the left; win probability, strike zone, Pitch finder, "Why" and history on the right). Today's Games becomes a grid of cards.
 - **Mouse** hover highlights; **keyboard:** <kbd>Space</kbd> pauses or resumes the demo, and everything works with Tab and Enter.
 
 ## How it works
@@ -79,18 +88,20 @@ src/
   settings.js    saved user preferences       theme.js  themes       audio.js  sound effects
   model.js       the home-run (and K, total bases) math: pure, unit tested, commented step by step
   gamestate.js   turns MLB's giant feed JSON into one small "game state" object
+  winprob.js     win probability helpers      pitchdata.js  the pitch log, pitch types and colors
+  saved.js       saved-pitch storage and grouping
   sources.js     liveSource (polls MLB) and demoSource (replays a saved game)
   api.js         all network calls
   ui/            home.js (Today's Games), game.js (game screen), lab.js (Matchup Lab),
                  stage.js (picks 3D or 2D), scene3d.js (the 3D stadium), scene.js (2D fallback),
-                 zone.js (strike zone), why.js, diamond.js, gl.js
+                 wp.js (win probability card), saved.js (Saved pitches), pitchdialog.js, zone.js (strike zone), why.js, diamond.js, gl.js
 public/
   data/rates.json         precomputed rates and names (made by scripts/build_rates.py)
   data/demo_game.json     saved playoff game for Demo mode
   data/team-colors.json   team ID -> color (edit freely)
   vendor/three.module.min.js   Three.js (MIT)
 scripts/         build_rates.py, build_demo.py, make_icons.py, serve.js
-tests/           model, gamestate, scene, lab
+tests/           model, gamestate, scene, lab, winprob, pitches
 ```
 
 The app never calls pybaseball. It only reads `rates.json`. (It holds home run, strikeout and total-bases rates, plus names, for every player, which is why it's about 600 KB.)
@@ -173,6 +184,14 @@ With 0 PA in a split you get exactly the prior (the "fall back to overall" rule)
 - **The stadium is generic.** The wall is 330 ft down the lines and 385 ft in center in every park; it is not each park's real shape. The theme sets the lighting, not the real time of day.
 - **Performance:** the 3D library (about 670 KB) only loads on the game screen, and drawing stops when the scene is off screen. Older phones may run it slowly; **Switch to 2D** is one tap. Not tested on a real iPhone.
 - **Sound** is synthesized, so it is a simple imitation, not a recording. It stays silent until you switch it on in Settings and tap the screen once.
+
+**Win probability and pitches**
+
+- **Win probability is MLB's number**, from their `contextMetrics` and `winProbability` feeds (undocumented, like the rest of the API, so they could change). I don't know exactly how their model works, so I can't explain its math the way I can for the home run model. Each poll adds a tiny (under 1 KB) request; the full game series (about 130 KB compressed) is only fetched when a plate appearance finishes, to draw the chart.
+- **The percentages never show 100% or 0% until the game is over**, so a very lopsided game reads 99% / 1%.
+- **The Demo's win probability is a saved copy** of MLB's numbers for that game, shown as of the start of each at-bat.
+- **Pitch finder, replays and saves use only what MLB's feed has.** A few pitches have no tracking data; those replay as a simple straight flight and say so. Replays are slowed down about 3x.
+- **Saved pitches live in this browser** (up to 300). Clearing the site's data deletes them, and they don't sync between devices.
 
 ## How far behind the MLB feed is the app?
 

@@ -14,6 +14,10 @@
 //   .prediction = home run chance, .predictions = { hr, k, tb }, .extraBase = chance of 2+ bases
 
 import { predictStat, extraBaseChance } from "./model.js";
+import { ordinal } from "./util.js";
+import { pitchesOf, pitchLogFromPlays, groupByInning } from "./pitchdata.js";
+
+export { ordinal, pitchesOf }; // (kept here so older imports keep working)
 
 // Events that are NOT the end of a plate appearance (a steal, a pickoff...). Same idea as
 // NOT_A_PLATE_APPEARANCE in scripts/build_rates.py.
@@ -42,13 +46,6 @@ export function isPlateAppearance(play) {
   return play.about.isComplete && !NOT_A_PA.some((prefix) => type.startsWith(prefix));
 }
 
-// 1 -> "1st", 2 -> "2nd", 11 -> "11th"
-export function ordinal(n) {
-  const suffixes = ["th", "st", "nd", "rd"];
-  const lastTwo = n % 100;
-  return n + (suffixes[(lastTwo - 20) % 10] || suffixes[lastTwo] || suffixes[0]);
-}
-
 const otherHand = (hand) => (hand === "L" ? "R" : "L");
 
 // A switch hitter ("S") bats from the opposite side of the pitcher's throwing hand.
@@ -64,32 +61,6 @@ function teamInfo(gameTeam, score) {
 // The pitches of a plate appearance, with where each crossed the plate (feet; pX is measured from
 // the catcher's view, positive = toward his right) and the batter's own zone top and bottom.
 // `limit` keeps only the first N pitches (the demo replays an at-bat part way through).
-function pathOf(pitchData) {
-  const c = pitchData?.coordinates;
-  if (!c || ![c.x0, c.y0, c.z0, c.vX0, c.vY0, c.vZ0, c.aX, c.aY, c.aZ].every(Number.isFinite)) return null;
-  return { x0: c.x0, y0: c.y0, z0: c.z0, vX0: c.vX0, vY0: c.vY0, vZ0: c.vZ0, aX: c.aX, aY: c.aY, aZ: c.aZ, plateTime: pitchData.plateTime };
-}
-
-export function pitchesOf(play, limit = Infinity) {
-  return (play?.playEvents || [])
-    .filter((e) => e.isPitch)
-    .slice(0, limit)
-    .map((e, i) => ({
-      n: i + 1,
-      x: e.pitchData?.coordinates?.pX,
-      z: e.pitchData?.coordinates?.pZ,
-      top: e.pitchData?.strikeZoneTop,
-      bottom: e.pitchData?.strikeZoneBottom,
-      speed: e.pitchData?.startSpeed,
-      type: e.details?.type?.description,
-      call: e.details?.call?.description || e.details?.description,
-      code: e.details?.code,
-      inPlay: !!e.details?.isInPlay,
-      // MLB's tracking of the pitch's flight (feet, seconds), used to fly the ball in 3D
-      path: pathOf(e.pitchData),
-    }));
-}
-
 // One completed plate appearance -> one row of the history list.
 function historyRow(play, venueId) {
   const isTop = play.about.isTopInning;
@@ -134,6 +105,14 @@ function baseState(feed) {
     isFinal: gd.status.abstractGameState === "Final",
     current: null,
     history: [],
+    pitchLog: [],   // every pitch of the game, grouped by inning (see pitchdata.js)
+    // what a saved pitch remembers about the game
+    game: {
+      pk: feed.gamePk,
+      date: gd.datetime?.officialDate || gd.game?.id?.slice(0, 10).replaceAll("/", "-") || "",
+      away: { id: gd.teams.away.id, name: gd.teams.away.teamName || gd.teams.away.name, abbr: gd.teams.away.abbreviation },
+      home: { id: gd.teams.home.id, name: gd.teams.home.teamName || gd.teams.home.name, abbr: gd.teams.home.abbreviation },
+    },
   };
 }
 
@@ -148,6 +127,7 @@ export function stateFromLiveFeed(feed) {
   state.home.score = line.teams.home.runs ?? 0;
   state.isLive = gd.status.abstractGameState === "Live";
   state.history = ld.plays.allPlays.filter(isPlateAppearance).map((p) => historyRow(p, gd.venue.id));
+  state.pitchLog = groupByInning(pitchLogFromPlays(ld.plays.allPlays.map((play) => ({ play }))));
   if (!state.isLive) return state;
 
   state.inningLabel = `${line.inningState || line.inningHalf} ${line.currentInningOrdinal}`;
@@ -224,6 +204,13 @@ export function demoStateAt(feed, frames, step, phase = 1) {
   state.isLive = !state.isFinal;
   state.statusLabel = state.isFinal ? "Final" : "Demo game";
   state.history = frames.slice(0, step).map((f) => historyRow(f.play, gd.venue.id));
+  // the pitch log: the finished at-bats, plus the one in progress (up to the pitches shown so far)
+  const logEntries = frames.slice(0, step).map((f) => ({ play: f.play }));
+  if (step < frames.length) {
+    const cur = frames[step].play;
+    logEntries.push({ play: cur, limit: phase === 0 ? 0 : cur.playEvents.filter((e) => e.isPitch).length - 1 });
+  }
+  state.pitchLog = groupByInning(pitchLogFromPlays(logEntries));
 
   if (state.isFinal) {
     const last = frames[frames.length - 1].play;

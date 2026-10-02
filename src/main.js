@@ -3,12 +3,14 @@
 //   #/game/12345  -> live game with that gamePk
 //   #/demo        -> replay of the saved demo game
 //   #/lab         -> the Matchup Lab (any batter vs any pitcher)
+//   #/saved       -> the pitches you saved
 
 import { loadRates, loadTeamColors } from "./api.js";
 import { liveSource, demoSource } from "./sources.js";
 import { showHome } from "./ui/home.js";
 import { showGame } from "./ui/game.js";
 import { showLab } from "./ui/lab.js";
+import { showSaved } from "./ui/saved.js";
 import { applyTheme } from "./theme.js";
 import { unlockAudio } from "./audio.js";
 
@@ -57,6 +59,19 @@ async function route() {
       return;
     }
     if (token === routeToken) leaveScreen = showLab(freshScreen(), { rates });
+    return;
+  }
+
+  if (hash === "#/saved") {
+    app.innerHTML = `<p class="hint pad">Loading…</p>`;
+    let colors;
+    try {
+      [, colors] = await loadData();
+    } catch {
+      if (token === routeToken) app.innerHTML = `<p class="hint pad">Couldn't load the data files. Check your connection, then <a href="#/">go back</a> and try again.</p>`;
+      return;
+    }
+    if (token === routeToken) leaveScreen = showSaved(freshScreen(), { colors });
     return;
   }
 

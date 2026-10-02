@@ -12,6 +12,9 @@ import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
 import { zoneHtml } from "./zone.js";
 import { drawWinProbability } from "./wp.js";
+import { loadSaved, storeSaved, makeSaved, toggleSaved, isSaved, pitchId } from "../saved.js";
+import { pitchKind, resultText, fastestKeys, typeColor } from "../pitchdata.js";
+import { showPitchDialog } from "./pitchdialog.js";
 import { createStage } from "./stage.js";
 
 const handWord = (h) => (h === "L" ? "Left" : "Right");
@@ -62,6 +65,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     <p class="kbd-hint">Keyboard: <kbd>Space</kbd> pause or resume the demo</p>
     </div><div class="col-side">
     <section id="zone" class="card zone" hidden></section>
+    <section id="finder" class="card finder"></section>
     <section id="why" class="card" hidden></section>
     <section id="history" class="card"></section>
     </div></div>`;
@@ -89,6 +93,11 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   let offline = false;
   let lastSpikeKey = null;
   let openPitch = null;           // pitch number tapped in the strike zone card
+  let saved = loadSaved();        // pitches you saved (on this device)
+  let finderFilter = "all";       // Pitch finder filter: all | strike | ball | play | fast
+  let finderTouched = false;      // false until you open/close an inning yourself (then we stop auto-opening the latest)
+  const openInnings = new Set();  // innings you have opened in the Pitch finder
+  let finderIndex = new Map();    // "atBatIndex-n" -> { row, pitch } for the pitches on screen
   const openWhy = new Set();      // "Why" rows whose tip is expanded
   const openHist = new Set();     // history rows that are expanded
   let whatIfCount = null;         // count picked in the "try another count" grid, e.g. "3-1"
@@ -157,7 +166,15 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   function drawZone(s) {
     const el = $("zone");
     el.hidden = !s.current;
-    if (s.current) el.innerHTML = zoneHtml(s.current.pitches, openPitch);
+    if (s.current) {
+      const actions = (p) => {
+        const id = pitchId(s.game.pk, s.current.atBatIndex, p.n);
+        const on = isSaved(saved, id);
+        return `<div class="zone-actions"><button type="button" class="chip-btn" data-replay-pitch="${s.current.atBatIndex}-${p.n}">Replay with flight path</button>
+          <button type="button" class="chip-btn ${on ? "on" : ""}" data-save-pitch="${s.current.atBatIndex}-${p.n}">${on ? "Saved" : "Save this pitch"}</button></div>`;
+      };
+      el.innerHTML = zoneHtml(s.current.pitches, openPitch, actions);
+    }
   }
 
   // The home run chance tile (it glows on a spike) and the "Why" breakdown under it.
@@ -222,6 +239,91 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     $("x-k-r").textContent = `League avg ${pct(k.leagueRate)}`;
   }
 
+  // ---------------------------------------------------------------- the Pitch finder
+  const KIND_LABEL = { all: "All", strike: "Strikes", ball: "Balls", play: "In play", fast: "Fastest 10" };
+
+  function drawFinder(s) {
+    const el = $("finder");
+    const groups = s.pitchLog || [];
+    finderIndex = new Map();
+    if (!groups.length) {
+      el.innerHTML = `<h2>Pitch finder</h2><p class="muted">Every pitch of the game will appear here, by inning.</p>`;
+      return;
+    }
+    const counts = { all: 0, strike: 0, ball: 0, play: 0, fast: 10 };
+    for (const g of groups) for (const r of g.rows) for (const p of r.pitches) { counts.all++; const k = pitchKind(p); if (counts[k] !== undefined) counts[k]++; }
+    const fast = finderFilter === "fast" ? fastestKeys(groups) : null;
+    const keep = (p, key) => (finderFilter === "all" ? true : finderFilter === "fast" ? fast.has(key) : pitchKind(p) === finderFilter);
+
+    const lastLabel = groups[groups.length - 1].label;
+    const html = [...groups].reverse().map((g) => {  // newest inning first
+      const open = finderTouched ? openInnings.has(g.label) : g.label === lastLabel;
+      let shown = 0;
+      const rows = open ? g.rows.map((row) => {
+        const items = row.pitches.filter((p) => keep(p, `${row.atBatIndex}-${p.n}`));
+        if (!items.length) return "";
+        shown += items.length;
+        return `<div class="ab">
+          <div class="ab-head"><b>${esc(row.batter.name)}</b> <span class="muted">(${row.batter.side}) vs</span> <b>${esc(row.pitcher.name)}</b> <span class="muted">(${row.pitcher.hand}HP)</span>${row.result ? ` <span class="ab-result">${esc(row.result)}</span>` : ""}</div>
+          <ul class="pitch-list">${items.map((p) => {
+            const key = `${row.atBatIndex}-${p.n}`;
+            finderIndex.set(key, { row, pitch: p });
+            const on = isSaved(saved, pitchId(s.game.pk, row.atBatIndex, p.n));
+            return `<li class="pitch-row kind-${pitchKind(p)}">
+              <span class="pr-num">#${p.n}<small>${p.balls}-${p.strikes}</small></span>
+              <span class="pr-main"><i class="chip-dot" style="background:${typeColor(p.typeCode)}"></i><b>${esc(p.type || "Pitch")}</b>${p.speed ? ` ${p.speed.toFixed(1)} mph` : ""}<small>${esc(resultText(p, row.result))}</small></span>
+              <span class="pr-btns"><button type="button" class="mini" data-replay-pitch="${key}">Replay</button><button type="button" class="mini ${on ? "on" : ""}" data-save-pitch="${key}" aria-pressed="${on}">${on ? "Saved" : "Save"}</button></span>
+            </li>`;
+          }).join("")}</ul>
+        </div>`;
+      }).join("") : "";
+      const note = open && shown === 0 ? `<p class="muted pad-s">No ${esc(KIND_LABEL[finderFilter].toLowerCase())} in this inning.</p>` : "";
+      return `<div class="inning-block">
+        <button type="button" class="inning-head" data-inning="${esc(g.label)}" aria-expanded="${open}"><b>${esc(g.label)}</b><span>${g.count} pitch${g.count === 1 ? "" : "es"}</span><i class="caret">${open ? "−" : "+"}</i></button>
+        ${rows}${note}
+      </div>`;
+    }).join("");
+
+    el.innerHTML = `
+      <h2>Pitch finder</h2>
+      <p class="hint">Every pitch of the game, by inning. Replay one in 3D with its flight path, and save the ones you want to keep.</p>
+      <div class="stage-controls filter-row" role="toolbar" aria-label="Filter pitches">
+        ${Object.keys(KIND_LABEL).map((k) => `<button type="button" class="chip-btn ${finderFilter === k ? "on" : ""}" data-finder-filter="${k}">${KIND_LABEL[k]} <small>${counts[k]}</small></button>`).join("")}
+      </div>
+      ${html}
+      <p class="note">${saved.length} saved pitch${saved.length === 1 ? "" : "es"} · <a href="#/saved">Open saved pitches</a></p>`;
+  }
+
+  // Replay one pitch (from the finder or the zone card) on the 3D stage, or in a pop-up if there is no 3D.
+  function replayFromLog(key) {
+    const entry = finderIndex.get(key) || currentEntry(key);
+    if (!entry) return;
+    const { row, pitch } = entry;
+    const ctx = { batter: row.batter, pitcher: row.pitcher, battingTeamId: row.isTop ? state.away.id : state.home.id, fieldingTeamId: row.isTop ? state.home.id : state.away.id };
+    if (stage.replayFull(ctx, pitch)) {
+      const box = $("scene").getBoundingClientRect();
+      if (box.top < 0 || box.bottom > window.innerHeight) $("scene").scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      showPitchDialog({ title: `${row.batter.name} vs ${row.pitcher.name}`, subtitle: `${row.label} · pitch ${pitch.n}`, pitch, atBatResult: row.result });
+    }
+  }
+  // (the strike-zone card shows the at-bat in progress, which is the last row of the pitch log)
+  function currentEntry(key) {
+    const cut = key.lastIndexOf("-");
+    const atBat = key.slice(0, cut), n = Number(key.slice(cut + 1));
+    const row = state.pitchLog.flatMap((g) => g.rows).find((r) => String(r.atBatIndex) === atBat);
+    const pitch = row?.pitches.find((p) => p.n === n);
+    return row && pitch ? { row, pitch } : null;
+  }
+  function toggleSave(key) {
+    const entry = finderIndex.get(key) || currentEntry(key);
+    if (!entry) return;
+    saved = toggleSaved(saved, makeSaved(state.game, entry.row, entry.pitch));
+    storeSaved(saved);
+    drawFinder(state);
+    drawZone(state);
+  }
+
   function drawHistory(s) {
     const el = $("history");
     if (!s.history.length) {
@@ -254,6 +356,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     drawWinProbability(wpEl, state, colors);
     drawHr(state);
     drawZone(state);
+    drawFinder(state);
     drawExtras(state);
     drawHistory(state);
     tick();
@@ -309,7 +412,19 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   // ---------------------------------------------------------------- taps (one listener for the whole screen)
   root.addEventListener("click", (event) => {
     const hit = (selector) => event.target.closest(selector);
-    if (hit("[data-why]")) {
+    if (hit("[data-save-pitch]")) {
+      toggleSave(hit("[data-save-pitch]").dataset.savePitch);
+    } else if (hit("[data-replay-pitch]")) {
+      replayFromLog(hit("[data-replay-pitch]").dataset.replayPitch);
+    } else if (hit("[data-inning]")) {
+      const label = hit("[data-inning]").dataset.inning;
+      if (!finderTouched) { finderTouched = true; openInnings.add(state.pitchLog.at(-1).label); } // start from what was showing
+      openInnings.has(label) ? openInnings.delete(label) : openInnings.add(label);
+      drawFinder(state);
+    } else if (hit("[data-finder-filter]")) {
+      finderFilter = hit("[data-finder-filter]").dataset.finderFilter;
+      drawFinder(state);
+    } else if (hit("[data-why]")) {
       const key = hit("[data-why]").dataset.why;
       openWhy.has(key) ? openWhy.delete(key) : openWhy.add(key);
       drawHr(state);

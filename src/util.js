@@ -44,6 +44,13 @@ export function mlbDateString(date = new Date()) {
   return parts; // en-CA formats as YYYY-MM-DD
 }
 
+// 1 -> "1st", 2 -> "2nd", 11 -> "11th"
+export function ordinal(n) {
+  const suffixes = ["th", "st", "nd", "rd"];
+  const lastTwo = n % 100;
+  return n + (suffixes[(lastTwo - 20) % 10] || suffixes[lastTwo] || suffixes[0]);
+}
+
 // localStorage can throw (private mode, storage full), so every use goes through these.
 export function saveLocal(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }

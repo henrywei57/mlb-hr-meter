@@ -787,6 +787,7 @@ export function createStage3d(container, hooks = {}) {
     const flightStart = a.contactAt;
     if (t >= flightStart && !a.hitLaunched) {
       a.hitLaunched = true;
+      hooks.onContact?.(a.info);
       ball.visible = true; pitcher.heldBall.visible = true;
       a.flash = 0.25;
       follow = { lockPos: camera.position.clone(), look: new THREE.Vector3(rig.tx, rig.ty, rig.tz), target: a.origin.clone(), fov: camera.fov };

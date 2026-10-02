@@ -314,6 +314,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     } else if (hit("[data-pitch]")) {
       openPitch = Number(hit("[data-pitch]").dataset.pitch);
       drawZone(state);
+      stage.replayPitch(openPitch); // fly that pitch again in the 3D scene
     } else if (hit("[data-hist]")) {
       const id = Number(hit("[data-hist]").dataset.hist);
       openHist.has(id) ? openHist.delete(id) : openHist.add(id);

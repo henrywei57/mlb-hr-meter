@@ -419,3 +419,7 @@ kbd { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; b
   .lab-tiles { grid-template-columns: repeat(3, 1fr); }
   .lab-number { font-size: 32px; }
 }
+
+/* ---------- Speed gun ---------- */
+.pitch-chip { position: absolute; left: 10px; bottom: 10px; padding: 5px 11px; border-radius: 99px; background: rgba(0, 0, 0, 0.72); color: #fff; font: 700 12px var(--font); pointer-events: none; animation: banner-in 0.25s ease-out; }
+.pitch-chip[hidden] { display: none; }

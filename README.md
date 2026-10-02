@@ -46,7 +46,7 @@ One layout that adapts to the screen:
 - **Tablet (640 px and up):** the same column, a little wider.
 - **Computer (960 px and up):** a two-column dashboard. The game screen puts the score, scene, meters and calls on the left and the "Why" list, count what-if grid and history on the right. Today's Games becomes a grid of cards, and My calls puts your stats beside the list.
 - **Mouse:** hover highlights and pointer cursors.
-- **Keyboard (computer):** <kbd>H</kbd> call home run, <kbd>B</kbd> call 2+ bases, <kbd>K</kbd> call strikeout, <kbd>Space</kbd> pause or resume the demo. History rows and every button work with Tab and Enter.
+- **Keyboard (computer):** <kbd>Space</kbd> pauses or resumes the demo. History rows and every button work with Tab and Enter.
 
 The layout rules are the last section of `styles.css`.
 
@@ -56,14 +56,11 @@ The layout rules are the last section of `styles.css`.
 - **Hit replay:** when an at-bat ends in a single, double, triple or home run, the scene replays it: the pitch comes in, the **bat swings**, and the **ball flies out**. The flight uses the real batted-ball data from MLB's feed (distance, launch angle and where it landed), so a ball hit to left field goes to the left. Home runs fly out of the park and show the distance and exit speed.
 - **Handedness always matches the data.** The scene uses the catcher's view from behind home plate: a **right-handed batter stands on the viewer's left of the plate and a lefty on the right**, with the bat held away from the plate. The pitcher faces you, so a **right-handed pitcher holds the ball on the viewer's left** and a lefty on the right. Code: `src/ui/scene.js`.
 - **Two smaller meters** under the home run meter: **Expected total bases** (single = 1, double = 2, triple = 3, home run = 4) and **Strikeout chance**. They use the same recipe as the home run number: league average, then batter, pitcher, lefty/righty, count and park.
-- **Make a call** on any of three things before the at-bat ends: a **home run**, a **strikeout**, or **2+ bases** (an extra-base hit). A hit pays `1 ÷ chance` points (a 4% long shot is +25), a miss costs 1. Tap a Call button again to undo it. A pop-up tells you how it turned out, and the history list marks the at-bats you called.
-- **My calls** (`#/calls`, or the My calls button): points, hit rate, best streak, best call, your hits vs the hits the model expected, and a breakdown by type of call. Demo calls can be hidden, and everything can be reset. Saved on the device only (no accounts).
 - **Tap a "Why" line** for a plain-English explanation of that factor.
 - **Try another count**: a grid showing the chance at every count for the current batter and pitcher; tap one for a what-if.
 - **Tap a history row** to read the play-by-play.
 - **Settings** (home screen): choose the spike threshold (1.5x to 4x) and turn vibration on or off.
 
-The chance on a call is the number on the meter when you tapped. In Demo mode each at-bat lasts only 4 seconds, so tap **Pause** first to take your time.
 
 ## How it works
 
@@ -71,19 +68,18 @@ The chance on a call is the number on the meter when you tapped. In Demo mode ea
 index.html, styles.css, manifest.webmanifest, sw.js   the app shell + install/offline support
 src/
   config.js      <- settings you'll edit: SPIKE_MULTIPLE, POLL_MS, DEMO_STEP_MS
-  calls.js       call scoring (HR / strikeout / 2+ bases), storage and stats (unit tested)
   settings.js    saved user preferences
   model.js       the home-run math (pure function, unit tested, commented step by step)
   gamestate.js   turns MLB's giant feed JSON into one small "game state" object
   sources.js     liveSource (polls MLB) and demoSource (replays a saved game)
   api.js         all network calls
-  ui/            home.js (Today's Games), game.js (game screen), calls.js (My calls), scene.js (batter/pitcher cartoon), why.js, diamond.js
+  ui/            home.js (Today's Games), game.js (game screen), scene.js (batter/pitcher cartoon), why.js, diamond.js
 public/
   data/rates.json         precomputed rates (made by scripts/build_rates.py)
   data/demo_game.json     saved playoff game for Demo mode
   data/team-colors.json   team ID -> color (edit freely)
 scripts/         build_rates.py, build_demo.py, make_icons.py, serve.js
-tests/           model.test.js, gamestate.test.js, calls.test.js
+tests/           model.test.js, gamestate.test.js
 ```
 
 The app never calls pybaseball. It only reads `rates.json`. (It holds home run, strikeout and total-bases rates for every player, which is why it's about 670 KB.)

@@ -149,30 +149,6 @@ button:active { background: var(--card-edge); }
   .team-score { font-size: 32px; }
 }
 
-/* ---------- Call a homer ---------- */
-.header-right { display: flex; align-items: center; gap: 10px; }
-.calls-link { font-size: 13px; font-weight: 700; text-decoration: none; }
-.call-box { border-color: var(--accent); }
-.call-button {
-  width: 100%; min-height: 56px; background: var(--accent); color: #1a1405; border: 0;
-  border-radius: 12px; font-size: 18px; font-weight: 800; display: flex; flex-direction: column; align-items: center; gap: 2px;
-}
-.call-button:active { background: #e6b83a; }
-.call-button small { font-size: 12px; font-weight: 600; opacity: 0.85; }
-.call-made { margin-bottom: 10px; }
-button.ghost { background: transparent; border: 1px solid var(--card-edge); color: var(--muted); width: 100%; }
-button.danger { color: #ff8a93; border-color: #6b2b32; margin-top: 12px; }
-
-.toast {
-  position: fixed; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom)); max-width: 496px; margin: 0 auto;
-  padding: 14px 16px; border-radius: 12px; font-weight: 700; z-index: 10; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
-  animation: slide-up 0.25s ease-out;
-}
-.toast.win { background: #16642f; color: #fff; border: 2px solid #5ee38a; }
-.toast.lose { background: var(--card); color: var(--text); border: 1px solid var(--card-edge); }
-@keyframes slide-up { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
-
 /* ---------- Why rows are buttons now ---------- */
 .why-item { border-top: 1px solid var(--card-edge); }
 .why-row {
@@ -194,37 +170,14 @@ h2.spaced { margin-top: 18px; }
 
 /* ---------- History rows are tappable ---------- */
 .hist-row { cursor: pointer; }
-.hist-row > .hist-call, .hist-row > .hist-desc { grid-column: 1 / -1; margin: 0; font-size: 13px; }
-.hist-call.hit { color: #5ee38a; font-weight: 700; }
-.hist-call.miss { color: var(--muted); }
+.hist-row > .hist-desc { grid-column: 1 / -1; margin: 0; font-size: 13px; }
 .hist-desc { color: var(--muted); }
 
-/* ---------- Home: calls button + settings ---------- */
-.calls-button {
-  display: block; text-decoration: none; background: var(--card); color: var(--text); border: 1px solid var(--accent);
-  font-weight: 800; padding: 14px; border-radius: var(--radius); margin-bottom: 14px;
-}
-.calls-button small { display: block; font-weight: 500; color: var(--muted); }
 .settings summary { cursor: pointer; font-weight: 700; min-height: 24px; }
 .setting { display: block; margin-top: 12px; font-size: 14px; }
 select { display: block; margin-top: 6px; width: 100%; min-height: 44px; font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--card-edge); border-radius: 8px; padding: 0 8px; }
 .check { display: flex; align-items: center; gap: 8px; }
 .check input { width: 20px; height: 20px; }
-
-/* ---------- My calls screen ---------- */
-.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.tile { background: var(--bg); border-radius: 10px; padding: 10px 4px; text-align: center; }
-.tile b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
-.tile span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.verdict { margin: 14px 0 6px; }
-.row-between { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.row-between h2 { margin: 0; }
-.call-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 10px 10px 12px; margin-top: 8px; border-radius: 10px; background: var(--bg); border-left: 6px solid var(--card-edge); }
-.call-row.hit { border-left-color: #5ee38a; background: #12301d; }
-.call-outcome { text-align: right; display: flex; flex-direction: column; font-size: 14px; }
-.call-outcome small { color: var(--muted); font-size: 12px; }
-.tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--muted); color: var(--muted); text-transform: uppercase; vertical-align: middle; }
-.call-list { list-style: none; margin: 0; padding: 0; }
 
 /* ---------- Smaller meters: expected total bases + strikeout chance ---------- */
 .extras { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
@@ -232,16 +185,9 @@ select { display: block; margin-top: 6px; width: 100%; min-height: 44px; font: i
 .extra-label { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .extra-number { font-size: 38px; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; }
 .extra-ref { font-size: 12px; color: var(--muted); min-height: 2.6em; }
-.call-small {
   margin-top: 6px; min-height: 48px; width: 100%; background: transparent; border: 2px solid var(--accent); color: var(--accent);
   border-radius: 10px; font-weight: 800; font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
 }
-.call-small small { font-size: 11px; font-weight: 600; color: var(--muted); }
-.call-small.made { background: #16642f; border-color: #5ee38a; color: #fff; }
-.kind-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.kind-table th { text-align: right; color: var(--muted); font-weight: 600; font-size: 12px; padding: 4px 2px; }
-.kind-table td { text-align: right; padding: 8px 2px; border-top: 1px solid var(--card-edge); font-variant-numeric: tabular-nums; }
-.kind-table th:first-child, .kind-table td:first-child { text-align: left; }
 
 /* ---------- Pitcher / batter scene ---------- */
 .scene { padding: 0; overflow: hidden; }
@@ -298,7 +244,7 @@ kbd { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; b
   #app { max-width: 1120px; padding: 24px 28px 60px; }
   h1 { font-size: 28px; }
 
-  /* game screen: scene, meters and calls on the left; why + history on the right */
+  /* game screen: scene and meters on the left; why + history on the right */
   .game-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
   .team-score { font-size: 44px; }
   .meter-number { font-size: 104px; }
@@ -311,25 +257,15 @@ kbd { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; b
   #games .game-card { margin-bottom: 0; }
   #games > .hint { grid-column: 1 / -1; }
 
-  /* My calls: stats on the left, the list on the right */
-  .calls-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 20px; align-items: start; }
-
-  /* pop-ups sit in the corner instead of stretching across the screen */
-  .toast { left: auto; right: 24px; max-width: 420px; }
-
   .kbd-hint { display: block; color: var(--muted); font-size: 13px; margin: 0 2px 12px; }
 }
 
 /* anything with a mouse: hover feedback and a pointer cursor */
 @media (hover: hover) and (pointer: fine) {
-  button, .game-card, .demo-button, .calls-button, .hist-row, .why-row, .count-cell { cursor: pointer; }
+  button, .game-card, .demo-button, .hist-row, .why-row, .count-cell { cursor: pointer; }
   .game-card:hover { border-color: var(--accent); background: #212837; }
   .demo-button:hover { background: #ffdb70; }
-  .calls-button:hover { background: #212837; }
   button:hover { background: var(--card-edge); }
-  .call-button:hover { background: #ffdb70; }
-  .call-small:hover { background: rgba(255, 207, 74, 0.12); }
-  .call-small.made:hover { background: #1b7a39; }
   .hist-row:hover { filter: brightness(1.25); }
   .why-row:hover { background: rgba(255, 255, 255, 0.04); }
 }

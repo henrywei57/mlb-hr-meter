@@ -11,7 +11,7 @@ import { THEMES, currentTheme, nextTheme, applyTheme } from "../theme.js";
 import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
 import { zoneHtml } from "./zone.js";
-import { sceneHtml, resultSceneHtml, playResult } from "./scene.js";
+import { createStage } from "./stage.js";
 
 const handWord = (h) => (h === "L" ? "Left" : "Right");
 
@@ -112,58 +112,17 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     chip.className = "chip " + (s.isLive ? "live" : "");
   }
 
-  // The pitcher/batter cartoon. Only redrawn when something visible changes, so its animations
-  // (the pitch, the idle bobbing) aren't restarted by every 7-second refresh.
-  let sceneKey = null;
-  let sceneBusyUntil = 0;   // while a hit replay is playing, leave the scene alone
-  let sceneTimer = null;
-  let seenHistory = null;   // how many finished at-bats we'd already seen (to spot new ones)
+  // The picture of the at-bat (3D stadium, or the flat 2D scene). It lives in stage.js.
+  const stage = createStage($("scene"), { colors });
+  let seenHistory = null;   // how many finished at-bats we'd already seen (to spot new hits)
 
-  function drawScene(s) {
-    const el = $("scene");
-    if (Date.now() < sceneBusyUntil) return;
-    if (!s.current || !s.isLive) { el.hidden = true; sceneKey = null; return; }
-    const awayBats = /^Top/.test(s.inningLabel);
-    const battingTeam = awayBats ? s.away : s.home;
-    const fieldingTeam = awayBats ? s.home : s.away;
-    const scene = sceneHtml({
-      batSide: s.current.batter.side,
-      pitchHand: s.current.pitcher.hand,
-      batterId: s.current.batter.id,
-      pitcherId: s.current.pitcher.id,
-      balls: s.balls, strikes: s.strikes, outs: s.outs,
-      batColor: teamColor(colors, battingTeam.id),
-      pitchColor: teamColor(colors, fieldingTeam.id),
-      spike: s.current.prediction.timesLeague >= getSettings().spikeMultiple,
-    });
-    el.hidden = false;
-    if (scene.key !== sceneKey) { el.innerHTML = scene.html; sceneKey = scene.key; }
-  }
-
-  // When a new at-bat finishes with a hit, replay it in the scene: the swing and the ball flying out.
+  // When a new at-bat finishes with a hit, replay it on the stage: the swing and the ball flying out.
   function checkForNewHit(s) {
     if (seenHistory === null || s.history.length < seenHistory) { seenHistory = s.history.length; return; } // first load or demo restart
     const fresh = s.history.slice(seenHistory);
     seenHistory = s.history.length;
     const row = [...fresh].reverse().find((r) => r.hit);
-    if (!row) return;
-    const battingTeam = row.isTop ? s.away : s.home;
-    const fieldingTeam = row.isTop ? s.home : s.away;
-    const replay = resultSceneHtml({
-      batSide: row.situation.batSide, pitchHand: row.situation.pitchHand,
-      batterId: row.situation.batterId, pitcherId: row.situation.pitcherId, batterName: row.batterName,
-      balls: 0, strikes: 0, outs: s.outs,
-      batColor: teamColor(colors, battingTeam.id), pitchColor: teamColor(colors, fieldingTeam.id),
-      hit: row.hit,
-    });
-    const el = $("scene");
-    el.hidden = false;
-    el.innerHTML = replay.html;
-    sceneKey = null; // the normal scene must redraw afterwards
-    playResult(el);
-    sceneBusyUntil = Date.now() + replay.durationMs;
-    clearTimeout(sceneTimer);
-    sceneTimer = setTimeout(() => { sceneBusyUntil = 0; if (state) drawScene(state); }, replay.durationMs);
+    if (row) stage.hit(row, s);
   }
 
   function drawMatchup(s) {
@@ -286,7 +245,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   function draw() {
     if (!state) return;
     drawScore(state);
-    drawScene(state);
+    stage.update(state);
     drawMatchup(state);
     drawMeter(state);
     drawZone(state);
@@ -381,5 +340,5 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
   });
 
   source.start();
-  return () => { clearInterval(clock); clearTimeout(sceneTimer); document.removeEventListener("keydown", onKey); wide.removeEventListener("change", placeMeter); source.stop(); }; // called when leaving this screen
+  return () => { clearInterval(clock); stage.dispose(); document.removeEventListener("keydown", onKey); wide.removeEventListener("change", placeMeter); source.stop(); }; // called when leaving this screen
 }

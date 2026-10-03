@@ -5,9 +5,11 @@
 // The game screen doesn't care which one it has.
 
 import { POLL_MS, DEMO_STEP_MS } from "./config.js";
-import { fetchFeed, fetchBatterLine, loadDemoFeed, fetchContextMetrics, fetchWinProbabilityList } from "./api.js";
+import { fetchFeed, fetchBatterLine, loadDemoFeed, fetchContextMetrics, fetchWinProbabilityList, loadHistoricalGame, loadRatesIndex, loadRatesFile } from "./api.js";
 import { stateFromLiveFeed, buildDemoFrames, demoStateAt, scoreState } from "./gamestate.js";
 import { seriesFromList, wpAtStart, wpAfterAll, NEUTRAL } from "./winprob.js";
+import { inningStops, ratesFileFor } from "./library.js";
+import { ordinal } from "./util.js";
 
 // MLB stamps every feed update, e.g. "20261001_001630" (UTC). When the stamp changes we log how
 // many seconds passed between MLB publishing that update and the app receiving it. That IS the
@@ -81,30 +83,35 @@ export function liveSource(gamePk, rates, { onUpdate, onError }) {
   };
 }
 
-export function demoSource(rates, { onUpdate, onError }) {
-  // One plate appearance takes DEMO_STEP_MS. It is shown in two halves: the batter stepping in
-  // at 0-0, then the count later in the at-bat. Then the next batter comes up.
-  const HALF_STEP_MS = DEMO_STEP_MS / 2;
-  let feed, frames;
-  let step = 0;   // which plate appearance we're on
-  let phase = 0;  // 0 = batter just stepped in, 1 = later count
+/**
+ * Replays a finished game one plate appearance at a time. Used by the saved Demo and by "replay any
+ * game". `load()` returns { feed, rates, note }: the game's feed (with _winProb and _batterLines),
+ * the rates to score it with, and a short note about which rates those are.
+ */
+function createReplay(load, { onUpdate, onError }, meta) {
+  let feed, frames, rates;
+  let step = 0;      // which plate appearance we're on (frames.length = the game is over)
+  let phase = 0;     // 0 = batter just stepped in, 1 = later count
+  let speed = 1;     // 1 = one plate appearance per DEMO_STEP_MS
   let paused = false;
   let timer = null;
   let stopped = false;
+  const halfStep = () => DEMO_STEP_MS / 2 / speed;
 
   function show() {
     const state = demoStateAt(feed, frames, step, phase);
     if (state.current) state.current.batterLine = feed._batterLines?.[state.current.batter.id] ?? null;
     scoreState(state, rates);
-    // the win chance at the start of this at-bat (from the saved copy of MLB's numbers)
+    // the win chance at the start of this at-bat (from MLB's numbers for this game)
     const series = feed._winProb || [];
     state.wp = state.current ? wpAtStart(series, state.current.atBatIndex) : wpAfterAll(series);
+    state.progress = { step, total: frames.length };
     onUpdate(state, Date.now());
   }
 
   function schedule() {
     clearTimeout(timer);
-    if (!stopped && !paused && step < frames.length) timer = setTimeout(tick, HALF_STEP_MS);
+    if (!stopped && !paused && step < frames.length) timer = setTimeout(tick, halfStep());
   }
 
   function tick() {
@@ -119,12 +126,31 @@ export function demoSource(rates, { onUpdate, onError }) {
     schedule();
   }
 
+  const goTo = (target) => {
+    step = Math.max(0, Math.min(frames.length, target));
+    phase = 0;
+    show();
+    schedule();
+  };
+
   return {
-    isDemo: true,
+    isReplay: true,
+    isDemo: !!meta.demo,
+    title: meta.title,
     get paused() { return paused; },
+    get speed() { return speed; },
+    get rates() { return rates; },
+    get ratesNote() { return meta.note || ""; },
+    get total() { return frames?.length ?? 0; },
+    get info() { return feed ? { date: feed.gameData.datetime?.officialDate, away: feed.gameData.teams.away.name, home: feed.gameData.teams.home.name } : null; },
+    /** The innings of the game, for the "Jump to inning" menu. */
+    get innings() { return frames ? inningStops(frames, ordinal) : []; },
     async start() {
       try {
-        feed = await loadDemoFeed();
+        const loaded = await load();
+        if (stopped) return;
+        ({ feed, rates } = loaded);
+        meta.note = loaded.note;
         frames = buildDemoFrames(feed);
         step = 0;
         phase = 0;
@@ -136,13 +162,39 @@ export function demoSource(rates, { onUpdate, onError }) {
     },
     pause() { paused = true; clearTimeout(timer); },
     resume() { paused = false; schedule(); },
-    restart() {
-      step = 0;
-      phase = 0;
-      paused = false;
-      show();
-      schedule();
-    },
+    restart() { paused = false; goTo(0); },
+    seek: goTo,                         // jump to an at-bat
+    stepBy(delta) { goTo(step + delta); },
+    toEnd() { goTo(frames.length); },
+    setSpeed(multiplier) { speed = multiplier; schedule(); },
     stop() { stopped = true; clearTimeout(timer); },
   };
+}
+
+// The saved demo game (works offline).
+export function demoSource(rates, callbacks) {
+  return createReplay(async () => ({ feed: await loadDemoFeed(), rates, note: "" }), callbacks, { demo: true, title: "Demo replay" });
+}
+
+// Any finished game from the Statcast era, fetched from MLB. It is scored with that season's rates
+// when we have them (public/data/rates/<season>.json), and with today's rates otherwise.
+export function replaySource(gamePk, defaultRates, callbacks) {
+  const load = async () => {
+    const feed = await loadHistoricalGame(gamePk);
+    const season = Number(feed.gameData.game.season);
+    const current = defaultRates.meta.player_seasons.at(-1);
+    const index = await loadRatesIndex();
+    const file = ratesFileFor(season, index.seasons, current);
+    if (file) {
+      try {
+        const rates = await loadRatesFile(file);
+        return { feed, rates, note: `Predictions use the ${rates.meta.player_seasons.join("-")} Statcast numbers for each player.` };
+      } catch { /* fall through to today's rates */ }
+    }
+    const note = season < current
+      ? `Predictions use today's player numbers (${defaultRates.meta.player_seasons.join("-")}), so players from other years show as estimates.`
+      : "";
+    return { feed, rates: defaultRates, note };
+  };
+  return createReplay(load, callbacks, { demo: false, title: "Replay" });
 }

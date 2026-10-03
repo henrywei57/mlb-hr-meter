@@ -5,6 +5,7 @@ import { esc, mlbDateString, saveLocal, loadLocal } from "../util.js";
 import { getSettings, saveSettings } from "../settings.js";
 import { THEMES, currentTheme, applyTheme } from "../theme.js";
 import { loadSaved } from "../saved.js";
+import { gameLink } from "../library.js";
 
 const REFRESH_MS = 30000;
 
@@ -37,7 +38,7 @@ function gameCard({ game, status }) {
   const home = game.teams.home;
   const showScore = status.kind !== "upcoming";
   return `
-    <a class="game-card ${status.kind}" href="#/game/${game.gamePk}">
+    <a class="game-card ${status.kind}" href="${gameLink(game)}">
       <span class="teams">
         <span class="team-line"><span>${esc(away.team.teamName || away.team.name)}</span>${showScore ? `<b>${away.score ?? 0}</b>` : ""}</span>
         <span class="team-line"><span>${esc(home.team.teamName || home.team.name)}</span>${showScore ? `<b>${home.score ?? 0}</b>` : ""}</span>
@@ -56,7 +57,8 @@ export function showHome(root) {
   root.innerHTML = `
     <header class="top"><h1>Today's Games</h1></header>
     <div class="actions">
-      <a class="demo-button" href="#/demo">Demo game <small>replay a real playoff game with 4 home runs</small></a>
+      <a class="demo-button" href="#/browse">Find any game <small>every game since 2015: pick a day, a team or the playoffs, and play it back</small></a>
+      <a class="lab-button" href="#/demo">Demo game <small>replay a real playoff game with 4 home runs</small></a>
       <a class="lab-button" href="#/lab">Matchup Lab <small>pit any batter against any pitcher</small></a>
       <a class="lab-button" href="#/saved">Saved pitches <small>${savedSummary()}</small></a>
     </div>

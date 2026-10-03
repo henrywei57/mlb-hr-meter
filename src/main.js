@@ -4,13 +4,16 @@
 //   #/demo        -> replay of the saved demo game
 //   #/lab         -> the Matchup Lab (any batter vs any pitcher)
 //   #/saved       -> the pitches you saved
+//   #/browse      -> find any game since 2015
+//   #/replay/123  -> play back any finished game
 
 import { loadRates, loadTeamColors } from "./api.js";
-import { liveSource, demoSource } from "./sources.js";
+import { liveSource, demoSource, replaySource } from "./sources.js";
 import { showHome } from "./ui/home.js";
 import { showGame } from "./ui/game.js";
 import { showLab } from "./ui/lab.js";
 import { showSaved } from "./ui/saved.js";
+import { showBrowse } from "./ui/browse.js";
 import { applyTheme } from "./theme.js";
 import { unlockAudio } from "./audio.js";
 
@@ -47,6 +50,7 @@ async function route() {
 
   const hash = location.hash || "#/";
   const game = hash.match(/^#\/game\/(\d+)$/);
+  const replay = hash.match(/^#\/replay\/(\d+)$/);
   const isDemo = hash === "#/demo";
 
   if (hash.startsWith("#/lab")) {
@@ -59,6 +63,19 @@ async function route() {
       return;
     }
     if (token === routeToken) leaveScreen = showLab(freshScreen(), { rates });
+    return;
+  }
+
+  if (hash.startsWith("#/browse")) {
+    app.innerHTML = `<p class="hint pad">Loading…</p>`;
+    let colors;
+    try {
+      [, colors] = await loadData();
+    } catch {
+      if (token === routeToken) app.innerHTML = `<p class="hint pad">Couldn't load the data files. Check your connection, then <a href="#/">go back</a> and try again.</p>`;
+      return;
+    }
+    if (token === routeToken) leaveScreen = showBrowse(freshScreen(), { colors });
     return;
   }
 
@@ -75,7 +92,7 @@ async function route() {
     return;
   }
 
-  if (!game && !isDemo) {
+  if (!game && !isDemo && !replay) {
     leaveScreen = showHome(freshScreen());
     return;
   }
@@ -92,12 +109,14 @@ async function route() {
   }
   if (token !== routeToken) return; // user navigated away while data was loading
 
-  const gamePk = isDemo ? "demo" : game[1];
+  const gamePk = isDemo ? "demo" : (replay || game)[1];
   leaveScreen = showGame(freshScreen(), {
     gamePk,
     rates,
     colors,
-    makeSource: (callbacks) => (isDemo ? demoSource(rates, callbacks) : liveSource(gamePk, rates, callbacks)),
+    makeSource: (callbacks) => (isDemo ? demoSource(rates, callbacks)
+      : replay ? replaySource(gamePk, rates, callbacks)
+      : liveSource(gamePk, rates, callbacks)),
   });
 }
 

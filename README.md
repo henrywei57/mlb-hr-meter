@@ -41,7 +41,14 @@ To pick up a new version, close the app fully and reopen it while online.
 
 ## What's in the app
 
-**Screens:** Today's Games (home), the game screen (live game or the Demo), and the Matchup Lab.
+**Screens:** Today's Games (home), Find a game, the game screen (live, a replay of any game, or the Demo), the Matchup Lab, and Saved pitches.
+
+### Find any game and play it back (`#/browse`, `#/replay/<id>`)
+Every game since Statcast began in 2015 can be found and played back pitch by pitch, with everything else in the app (3D scene, win probability, Pitch finder, saving pitches).
+- **Find it:** by **date** (a calendar with previous/next day), by a **team's season** (all of a team's games, grouped by month with the result, including its postseason), or by **postseason series** for any year. There is also a **Random game** button and a shelf of **Famous games** (the 2016 and 2019 World Series Game 7s, Judge's 62nd home run, Ohtani's 50-50 game, a perfect game, and more).
+- **Play it:** the replay goes one plate appearance at a time like the Demo, with a **scrubber** to drag anywhere in the game, **previous / next at-bat** buttons, **Pause / Resume / Restart / To end**, a **Speed** menu (0.5x to 8x) and a **Jump to inning** menu. Keyboard: Space pauses, the arrow keys step.
+- **Where the data comes from:** MLB's game feed, which carries the Statcast pitch tracking for every game since 2015. A game loads in about a second. Finished games on the home screen open as replays too.
+- **Predictions use that season's numbers.** The home run, strikeout and total-bases tiles for a 2016 game use each player's 2015-16 Statcast rates (a file per season in `public/data/rates/`, built by `scripts/build_history.py`). Players with too little data, and any season without a file, fall back to the league average and are marked **est.**; a note on the replay bar says which numbers are in use.
 
 ### Win probability (the big number)
 The card right under the score shows each team's chance to win, as two big percentages, a tug-of-war bar in the team colors, and a **chart of how the game has swung** play by play (the home team's chance, shaded in the team that is ahead, with the innings marked). The numbers come from **MLB's own win probability model**, not ours, so they match what MLB's app shows. They depend on the inning, outs, runners and score.
@@ -91,17 +98,19 @@ src/
   winprob.js     win probability helpers      pitchdata.js  the pitch log, pitch types and colors
   saved.js       saved-pitch storage and grouping
   sources.js     liveSource (polls MLB) and demoSource (replays a saved game)
-  api.js         all network calls
+  api.js         all network calls     library.js  browser/replay helpers (dates, grouping)
   ui/            home.js (Today's Games), game.js (game screen), lab.js (Matchup Lab),
                  stage.js (picks 3D or 2D), scene3d.js (the 3D stadium), scene.js (2D fallback),
                  wp.js (win probability card), saved.js (Saved pitches), pitchdialog.js, zone.js (strike zone), why.js, diamond.js, gl.js
 public/
   data/rates.json         precomputed rates and names (made by scripts/build_rates.py)
   data/demo_game.json     saved playoff game for Demo mode
+  data/rates/<season>.json  each Statcast season's own rates (2015-2025), used when replaying old games
+  data/classics.json      the Famous games shelf (made by scripts/build_classics.py)
   data/team-colors.json   team ID -> color (edit freely)
   vendor/three.module.min.js   Three.js (MIT)
-scripts/         build_rates.py, build_demo.py, make_icons.py, serve.js
-tests/           model, gamestate, scene, lab, winprob, pitches
+scripts/         build_rates.py, build_history.py, build_classics.py, build_demo.py, make_icons.py, serve.js
+tests/           model, gamestate, scene, lab, winprob, pitches, library
 ```
 
 The app never calls pybaseball. It only reads `rates.json`. (It holds home run, strikeout and total-bases rates, plus names, for every player, which is why it's about 600 KB.)
@@ -123,6 +132,8 @@ The function returns the final probability *and* each factor (batter, pitcher, l
 pip install pybaseball pandas
 python scripts/build_rates.py     # first run downloads Statcast: slow (tens of minutes). Cached after that.
 python scripts/build_demo.py      # re-pick/re-save the demo game
+python scripts/build_history.py   # a rates file for every Statcast season 2015-2025: takes HOURS the first time (cached after)
+python scripts/build_classics.py  # re-find the Famous games and check their teams
 ```
 
 **Shrinkage (small samples).** A raw rate like "1 HR in 12 PA = 8%" is mostly luck, so every rate is pulled toward a sensible prior by adding pretend plate appearances of that prior:
@@ -192,6 +203,15 @@ With 0 PA in a split you get exactly the prior (the "fall back to overall" rule)
 - **The Demo's win probability is a saved copy** of MLB's numbers for that game, shown as of the start of each at-bat.
 - **Pitch finder, replays and saves use only what MLB's feed has.** A few pitches have no tracking data; those replay as a simple straight flight and say so. Replays are slowed down about 3x.
 - **Saved pitches live in this browser** (up to 300). Clearing the site's data deletes them, and they don't sync between devices.
+
+**Replaying old games**
+
+- **Older games are scored with that season's rates, not the rates at that moment.** For a 2016 game a player's numbers come from 2015 and 2016 together, which includes pitches after the game was played (the 2016 file is not "what we knew then"). It's a fair guide to a player's skill in that era, not a true forecast.
+- **A few pitches or games may be missing tracking data**, especially around the 2015 start-up. Those pitches replay as a simple straight flight.
+- **Replays need a connection** (the game is fetched from MLB when you open it); only the Demo works offline. The per-season rates files are cached after first use.
+- **MLB's win probability model changed over the years**, and it is theirs, so older games show MLB's numbers as published today.
+- **Parks:** park factors come from Savant's 3-year window ending in that season; a ballpark without a factor counts as average.
+- **The Famous games shelf** was checked against MLB's schedule (teams, date and score), but the descriptions are my own summaries.
 
 ## How far behind the MLB feed is the app?
 

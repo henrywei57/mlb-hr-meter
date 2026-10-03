@@ -1,0 +1,112 @@
+[
+ {
+  "gamePk": 487637,
+  "date": "2016-11-02",
+  "title": "World Series Game 7 (2016)",
+  "blurb": "Extra innings, a rain delay, and the Cubs end a 108-year drought.",
+  "away": "Chicago Cubs",
+  "home": "Cleveland Indians",
+  "awayScore": 8,
+  "homeScore": 7
+ },
+ {
+  "gamePk": 599377,
+  "date": "2019-10-30",
+  "title": "World Series Game 7 (2019)",
+  "blurb": "The road team won every game of the series, ending in Houston.",
+  "away": "Washington Nationals",
+  "home": "Houston Astros",
+  "awayScore": 6,
+  "homeScore": 2
+ },
+ {
+  "gamePk": 526515,
+  "date": "2017-10-29",
+  "title": "World Series Game 5 (2017)",
+  "blurb": "13-12 in 11 innings: five lead changes and a wild slugfest.",
+  "away": "Los Angeles Dodgers",
+  "home": "Houston Astros",
+  "awayScore": 12,
+  "homeScore": 13
+ },
+ {
+  "gamePk": 563409,
+  "date": "2018-10-26",
+  "title": "World Series Game 3 (2018)",
+  "blurb": "18 innings, the longest World Series game ever by time.",
+  "away": "Boston Red Sox",
+  "home": "Los Angeles Dodgers",
+  "awayScore": 2,
+  "homeScore": 3
+ },
+ {
+  "gamePk": 635886,
+  "date": "2020-10-27",
+  "title": "World Series Game 6 (2020)",
+  "blurb": "The Dodgers clinch, after a famous pitching change.",
+  "away": "Tampa Bay Rays",
+  "home": "Los Angeles Dodgers",
+  "awayScore": 1,
+  "homeScore": 3
+ },
+ {
+  "gamePk": 775296,
+  "date": "2024-10-30",
+  "title": "World Series Game 5 (2024)",
+  "blurb": "The Dodgers come back from 5-0 down to win the title.",
+  "away": "Los Angeles Dodgers",
+  "home": "New York Yankees",
+  "awayScore": 7,
+  "homeScore": 6
+ },
+ {
+  "gamePk": 662010,
+  "date": "2022-10-04",
+  "title": "Aaron Judge's 62nd home run (2022)",
+  "blurb": "He breaks the American League single-season record (game 2 of a doubleheader).",
+  "away": "New York Yankees",
+  "home": "Texas Rangers",
+  "awayScore": 2,
+  "homeScore": 3
+ },
+ {
+  "gamePk": 746011,
+  "date": "2024-09-19",
+  "title": "Shohei Ohtani's 50-50 game (2024)",
+  "blurb": "Three home runs and two steals to become the first 50-50 player.",
+  "away": "Los Angeles Dodgers",
+  "home": "Miami Marlins",
+  "awayScore": 20,
+  "homeScore": 4
+ },
+ {
+  "gamePk": 446255,
+  "date": "2015-10-14",
+  "title": "Bautista's bat flip game (2015)",
+  "blurb": "ALDS Game 5: the seventh inning, and one of baseball's most famous home runs.",
+  "away": "Texas Rangers",
+  "home": "Toronto Blue Jays",
+  "awayScore": 3,
+  "homeScore": 6
+ },
+ {
+  "gamePk": 717579,
+  "date": "2023-06-28",
+  "title": "Domingo German's perfect game (2023)",
+  "blurb": "27 up, 27 down: a perfect game.",
+  "away": "New York Yankees",
+  "home": "Oakland Athletics",
+  "awayScore": 11,
+  "homeScore": 0
+ },
+ {
+  "gamePk": 413663,
+  "date": "2015-04-06",
+  "title": "Opening Day 2015",
+  "blurb": "The first day of the first Statcast season.",
+  "away": "Toronto Blue Jays",
+  "home": "New York Yankees",
+  "awayScore": 6,
+  "homeScore": 1
+ }
+]

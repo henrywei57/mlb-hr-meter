@@ -27,17 +27,23 @@ function buzz(pattern = [200, 100, 200]) {
   } catch { /* not supported or blocked: ignore */ }
 }
 
-export function showGame(root, { gamePk, rates, colors, makeSource }) {
+export function showGame(root, { gamePk, rates: defaultRates, colors, makeSource }) {
   root.innerHTML = `
     <header class="top">
       <a class="back" href="#/">‹ Games</a>
       <span class="header-right"><button type="button" id="theme-btn" class="theme-btn" title="Switch theme"></button><span id="chip" class="chip"></span></span>
     </header>
-    <div id="demo-bar" class="demo-bar" hidden>
-      <span>Demo replay</span>
-      <span class="spacer"></span>
-      <button id="pause" type="button">Pause</button>
-      <button id="restart" type="button">Restart</button>
+    <div id="demo-bar" class="demo-bar replay-bar" hidden>
+      <div class="rb-row"><b id="rb-title">Replay</b><span class="spacer"></span>
+        <button id="pause" type="button">Pause</button><button id="restart" type="button">Restart</button></div>
+      <div class="rb-row"><button type="button" id="rb-prev" aria-label="Previous at-bat">‹</button>
+        <input type="range" id="rb-seek" min="0" max="0" value="0" aria-label="Scrub through the game">
+        <button type="button" id="rb-next" aria-label="Next at-bat">›</button></div>
+      <div class="rb-row rb-meta"><span id="rb-label" class="muted"></span><span class="spacer"></span>
+        <label>Speed <select id="rb-speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option><option value="8">8x</option></select></label>
+        <label>Inning <select id="rb-inning" aria-label="Jump to inning"></select></label>
+        <button type="button" id="rb-end">To end</button></div>
+      <p id="rb-note" class="note" hidden></p>
     </div>
     <div id="banner" class="banner" hidden></div>
     <div class="game-grid"><div class="col-main">
@@ -62,7 +68,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
         <div class="extra-ref" id="x-k-r"></div>
       </div>
     </section>
-    <p class="kbd-hint">Keyboard: <kbd>Space</kbd> pause or resume the demo</p>
+    <p class="kbd-hint">Replays: <kbd>Space</kbd> pause or resume · <kbd>←</kbd> <kbd>→</kbd> step through at-bats</p>
     </div><div class="col-side">
     <section id="zone" class="card zone" hidden></section>
     <section id="finder" class="card finder"></section>
@@ -71,6 +77,8 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     </div></div>`;
 
   const $ = (id) => root.querySelector("#" + id);
+  // The rates in use: a replay of an older game loads that season's own rates file.
+  const activeRates = () => source.rates || defaultRates;
   const wpEl = $("wp");
   const hrTile = $("x-hr");
   // On a computer the win probability card sits at the top of the right column; on a phone it stays
@@ -127,8 +135,8 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
         </div>
       </div>`;
     const chip = $("chip");
-    chip.textContent = s.isFinal ? "Final" : s.isLive ? "Live" : s.statusLabel;
-    chip.className = "chip " + (s.isLive ? "live" : "");
+    chip.textContent = s.isFinal ? "Final" : source.isReplay ? "Replay" : s.isLive ? "Live" : s.statusLabel;
+    chip.className = "chip " + (s.isLive && !source.isReplay ? "live" : "");
   }
 
   // The picture of the at-bat (3D stadium, or the flat 2D scene). It lives in stage.js.
@@ -209,7 +217,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     const cells = [];
     for (let balls = 0; balls <= 3; balls++) {
       for (let strikes = 0; strikes <= 2; strikes++) {
-        const p = predictHomeRun(rates, { ...sit, balls, strikes });
+        const p = predictHomeRun(activeRates(), { ...sit, balls, strikes });
         const key = `${balls}-${strikes}`;
         const isNow = balls === sit.balls && strikes === sit.strikes;
         cells.push(`<button type="button" class="count-cell ${isNow ? "now" : ""} ${whatIfCount === key ? "picked" : ""}" data-count="${key}"
@@ -219,7 +227,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     let preview = `<p class="hint">Tap a count to see what it would do to the chance.</p>`;
     if (whatIfCount) {
       const [b, st] = whatIfCount.split("-").map(Number);
-      const p = predictHomeRun(rates, { ...sit, balls: b, strikes: st });
+      const p = predictHomeRun(activeRates(), { ...sit, balls: b, strikes: st });
       preview = `<p class="what-if">At <b>${whatIfCount}</b> this at-bat would be <b>${pct(p.probability)}</b> (${p.timesLeague.toFixed(1)}x the league average).</p>`;
     }
     return `<h2 class="spaced">Try another count</h2>${preview}<div class="count-grid">${cells.join("")}</div>
@@ -359,6 +367,7 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     drawFinder(state);
     drawExtras(state);
     drawHistory(state);
+    drawReplayBar(state);
     tick();
   }
 
@@ -379,12 +388,20 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
       state = newState;
       lastUpdate = time;
       offline = false;
-      if (!source.isDemo) saveLocal(`hr:game:${gamePk}`, { state: newState, time });
+      if (!source.isReplay) saveLocal(`hr:game:${gamePk}`, { state: newState, time });
 
       checkForNewHit(newState);
       draw();
     },
     onError() {
+      if (source.isReplay) {
+        // a replay can't retry by itself: explain, and offer a way back
+        if (!state) {
+          $("banner").hidden = false;
+          $("banner").innerHTML = `Couldn't load that game from MLB. Check your connection, then <a href="">try again</a> or <a href="#/browse">pick another game</a>.`;
+        }
+        return;
+      }
       if (!state) {
         // First load failed. If we've seen this game before, show the saved copy.
         const saved = loadLocal(`hr:game:${gamePk}`);
@@ -398,15 +415,48 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     },
   });
 
-  // ---------------------------------------------------------------- demo controls
-  if (source.isDemo) {
+  // ---------------------------------------------------------------- replay controls (demo and "replay any game")
+  let seeking = false; // true while a finger or mouse is dragging the scrubber
+  let innerOptions = "";
+  function drawReplayBar(s) {
+    if (!source.isReplay) return;
+    const total = source.total, step = s.progress?.step ?? 0;
+    const info = source.info;
+    $("rb-title").textContent = source.isDemo || !info ? source.title : `${info.away} @ ${info.home} · ${info.date}`;
+    const seek = $("rb-seek");
+    seek.max = total;
+    if (!seeking) seek.value = step;
+    $("rb-label").textContent = step >= total ? "Game over" : `At-bat ${step + 1} of ${total}`;
+    // the inning menu (built once the game has loaded)
+    const stops = source.innings;
+    const options = stops.map((i) => `<option value="${i.step}">${i.label}</option>`).join("");
+    if (options !== innerOptions) { $("rb-inning").innerHTML = options; innerOptions = options; }
+    const here = stops.filter((i) => i.step <= step).at(-1);
+    if (here) $("rb-inning").value = String(here.step);
+    const note = $("rb-note");
+    note.hidden = !source.ratesNote;
+    note.textContent = source.ratesNote;
+    $("pause").textContent = source.paused ? "Resume" : "Pause";
+  }
+
+  if (source.isReplay) {
     $("demo-bar").hidden = false;
-    const pause = $("pause");
-    pause.addEventListener("click", () => {
-      if (source.paused) { source.resume(); pause.textContent = "Pause"; }
-      else { source.pause(); pause.textContent = "Resume"; }
+    if (!source.isDemo) { $("banner").hidden = false; $("banner").textContent = "Loading the game from MLB…"; }
+    const jump = (fn) => { seenHistory = null; fn(); }; // jumping around shouldn't replay a hit for every at-bat we skipped
+    $("pause").addEventListener("click", () => {
+      if (source.paused) source.resume(); else source.pause();
+      $("pause").textContent = source.paused ? "Resume" : "Pause";
     });
-    $("restart").addEventListener("click", () => { source.restart(); pause.textContent = "Pause"; lastSpikeKey = null; });
+    $("restart").addEventListener("click", () => jump(() => { source.restart(); $("pause").textContent = "Pause"; lastSpikeKey = null; }));
+    $("rb-prev").addEventListener("click", () => jump(() => source.stepBy(-1)));
+    $("rb-next").addEventListener("click", () => jump(() => source.stepBy(1)));
+    $("rb-end").addEventListener("click", () => jump(() => source.toEnd()));
+    $("rb-speed").addEventListener("change", (e) => source.setSpeed(Number(e.target.value)));
+    $("rb-inning").addEventListener("change", (e) => jump(() => source.seek(Number(e.target.value))));
+    const seek = $("rb-seek");
+    seek.addEventListener("pointerdown", () => { seeking = true; });
+    seek.addEventListener("input", () => { seenHistory = null; source.seek(Number(seek.value)); });
+    for (const type of ["pointerup", "pointercancel", "change"]) seek.addEventListener(type, () => { seeking = false; });
   }
 
   // ---------------------------------------------------------------- taps (one listener for the whole screen)
@@ -448,10 +498,12 @@ export function showGame(root, { gamePk, rates, colors, makeSource }) {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(event.target.tagName)) return;
     const key = event.key.toLowerCase();
-    if (key === " " && source.isDemo && event.target === document.body) {
+    if (!source.isReplay) return;
+    if (key === " " && event.target === document.body) {
       event.preventDefault(); // stop the page scrolling
       $("pause").click();
-    }
+    } else if (key === "arrowright") { $("rb-next").click(); }
+    else if (key === "arrowleft") { $("rb-prev").click(); }
   }
   document.addEventListener("keydown", onKey);
 

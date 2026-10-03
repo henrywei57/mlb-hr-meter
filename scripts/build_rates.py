@@ -83,7 +83,7 @@ def download_season(season):
             "p_throws", "events", "balls", "strikes", "game_type"]
     pieces = []
     # one month at a time so a network hiccup only costs a month, not the whole season
-    last = min(date(season, 10, 1), date.today())
+    last = min(date(season, 10, 7), date.today())
     ranges = []
     for month in range(3, 11):
         first = date(season, month, 15 if month == 3 else 1)
@@ -276,15 +276,18 @@ def fetch_park_factors(year, pa):
     return hr, k, tb, names, rows[0].get("year_range", "")
 
 
-# ---------------------------------------------------------------- main
-def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--out", default=str(OUT_PATH))
-    args = parser.parse_args()
+# ---------------------------------------------------------------- building one rates file
+def build(player_seasons, count_season, park_year, out_path, with_names=True):
+    """
+    Build one rates file.
+      player_seasons  seasons of Statcast pitches used for each player's rates
+      count_season    the season used for the ball-strike count table
+      park_year       the Savant park-factor year (a 3-year rolling window ending here)
+      with_names      add player names (only the Matchup Lab needs them, so older files skip them)
+    """
+    season_data = {s: download_season(s) for s in sorted(set(player_seasons + [count_season]))}
 
-    season_data = {s: download_season(s) for s in sorted(set(PLAYER_SEASONS + [COUNT_SEASON]))}
-
-    pa = pd.concat([to_plate_appearances(season_data[s]) for s in PLAYER_SEASONS], ignore_index=True)
+    pa = pd.concat([to_plate_appearances(season_data[s]) for s in player_seasons], ignore_index=True)
     print(f"{len(pa):,} plate appearances, {int(pa['is_hr'].sum()):,} HR, "
           f"{int(pa['is_k'].sum()):,} strikeouts, {int(pa['tb'].sum()):,} total bases")
 
@@ -292,14 +295,18 @@ def main():
     platoon_bat = {st: league_platoon(pa, "stand", "p_throws", c["col"]) for st, c in STATS.items()}
     platoon_pit = {st: league_platoon(pa, "p_throws", "stand", c["col"]) for st, c in STATS.items()}
 
-    park_hr, park_k, park_tb, park_names, park_range = fetch_park_factors(PARK_YEAR, pa)
-    counts = count_tables(season_data[COUNT_SEASON])
+    try:
+        park_hr, park_k, park_tb, park_names, park_range = fetch_park_factors(park_year, pa)
+    except Exception as err:  # noqa: BLE001 - without park factors every park is simply "average"
+        print(f"  no park factors for {park_year}: {err}")
+        park_hr, park_k, park_tb, park_names, park_range = {}, {}, {}, {}, ""
+    counts = count_tables(season_data[count_season])
 
     result = {
         "meta": {
             "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "player_seasons": PLAYER_SEASONS,
-            "count_season": COUNT_SEASON,
+            "player_seasons": player_seasons,
+            "count_season": count_season,
             "park_factor_years": park_range,
             "pretend_pa": {stat: {k: v for k, v in cfg.items() if k != "col"} for stat, cfg in STATS.items()},
             "min_pa": MIN_PA,
@@ -325,18 +332,27 @@ def main():
         "pitchers": player_table(pa, "pitcher", "p_throws", "stand", "k_pitcher", platoon_pit, False),
     }
 
-    names = fetch_names(set(result["batters"]) | set(result["pitchers"]))
-    for group in ("batters", "pitchers"):
-        for pid, entry in result[group].items():
-            if pid in names:
-                entry["name"] = names[pid]
+    if with_names:
+        names = fetch_names(set(result["batters"]) | set(result["pitchers"]))
+        for group in ("batters", "pitchers"):
+            for pid, entry in result[group].items():
+                if pid in names:
+                    entry["name"] = names[pid]
 
-    out = Path(args.out)
+    out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, separators=(",", ":")), encoding="utf-8")
     lg = result["league"]
     print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB): {len(result['batters'])} batters, "
-          f"{len(result['pitchers'])} pitchers; league per PA: HR {lg['hr_per_pa']}, K {lg['k_per_pa']}, TB {lg['tb_per_pa']}")
+          f"{len(result['pitchers'])} pitchers; league per PA: HR {lg['hr_per_pa']}, K {lg['k_per_pa']}, TB {lg['tb_per_pa']}", flush=True)
+
+
+# ---------------------------------------------------------------- main
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--out", default=str(OUT_PATH))
+    args = parser.parse_args()
+    build(PLAYER_SEASONS, COUNT_SEASON, PARK_YEAR, args.out)
 
 
 if __name__ == "__main__":

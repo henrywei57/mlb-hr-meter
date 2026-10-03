@@ -3,3 +3,4 @@ scripts/cache/
 scripts/build.log
 node_modules/
 __pycache__/
+scripts/history.log

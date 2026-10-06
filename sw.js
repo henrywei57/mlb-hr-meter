@@ -7,7 +7,7 @@
 //
 // Change CACHE_NAME whenever you add a file to APP_FILES, so old caches get cleaned up.
 
-const CACHE_NAME = "hr-meter-v20";
+const CACHE_NAME = "hr-meter-v21";
 
 const APP_FILES = [
   "./",

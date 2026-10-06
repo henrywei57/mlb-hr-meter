@@ -537,6 +537,18 @@ export function createStage3d(container, hooks = {}) {
     batter.batPivot.position.set(batter.m * 0.95, 0.1, 0.25);
     setHead(batter, next.batterId);
     setHead(pitcher, next.pitcherId);
+    // The batter's head is a flat-faced 3D head instead of a camera-facing photo, so it can turn
+    // to follow the pitch. The photo is the same one the sprite would show.
+    batter.head.visible = false;
+    const headRig = new THREE.Group(); headRig.position.copy(batter.head.position);
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(1.05, 20, 14), new THREE.MeshStandardMaterial({ color: next.batColor, roughness: 0.8 }));
+    skull.scale.set(1, 1, 0.55);
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.98, 32), new THREE.MeshBasicMaterial({ map: batter.head.material.map, transparent: true }));
+    face.position.z = 0.6;
+    headRig.add(skull, face);
+    batter.torsoGroup.add(headRig);
+    batter.headRig = headRig; batter.faceMat = face.material;
+    batter.look = { yaw: 0, pitch: 0 };
     cfg = { ...next };
     pose = null;
     catcher.mats.jersey.color.set(next.pitchColor); // the catcher wears the fielding team's color
@@ -951,6 +963,7 @@ export function createStage3d(container, hooks = {}) {
         batter.batPivot.rotation.set(-0.5 - cur.tilt * 0.006, 0, -batter.m * rad(cur.tilt) * 0.55 + Math.sin(time * 3) * 0.02); // leans out and back, clear of his face
       }
       batter.root.updateMatrixWorld(true);
+      updateBatterHead(dt);
       updateArmLinks(batter);
 
       pitcher.body.position.y = cur.slump * -0.6 + breathe + (pitcherShake ? Math.sin(time * 60) * 0.03 : 0);
@@ -978,6 +991,23 @@ export function createStage3d(container, hooks = {}) {
     const bigger = clamp(camera.position.distanceTo(ball.position) / 38, 1, 9);
     ball.scale.setScalar(bigger);
     trail.forEach((m, i) => { if (m.visible) m.scale.setScalar(bigger * (1 - i / TRAIL)); });
+  }
+
+  // The batter's head turns to follow the ball from the pitcher's hand to the plate (and out after
+  // contact); between pitches it looks at the pitcher.
+  const _look = new THREE.Vector3();
+  function updateBatterHead(dt) {
+    if (!batter.headRig) return;
+    if (batter.faceMat.map !== batter.head.material.map) { batter.faceMat.map = batter.head.material.map; batter.faceMat.needsUpdate = true; }
+    if (ball.visible && anim) _look.copy(ball.position); else _look.set(0, 6, MOUND_Z);
+    batter.torsoGroup.updateWorldMatrix(true, false);
+    const local = batter.torsoGroup.worldToLocal(_look).sub(batter.headRig.position);
+    const yaw = clamp(Math.atan2(local.x, local.z), -1.75, 1.75);
+    const pitch = clamp(Math.atan2(-local.y, Math.hypot(local.x, local.z)), -0.5, 0.5);
+    const k = 1 - Math.exp(-dt * (anim ? 14 : 5));
+    batter.look.yaw += (yaw - batter.look.yaw) * k;
+    batter.look.pitch += (pitch - batter.look.pitch) * k;
+    batter.headRig.rotation.set(batter.look.pitch * 0.6, batter.look.yaw, 0, "YXZ");
   }
 
   function stepAnim(dt) {

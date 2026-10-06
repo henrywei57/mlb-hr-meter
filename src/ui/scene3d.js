@@ -160,15 +160,50 @@ function crowdTexture() {
   return tex;
 }
 
-const wallRadius = (psi) => 385 - 55 * Math.pow(psi / 45, 2); // 330 ft down the lines, 385 in center
+// ---------------------------------------------------------------- one park's shape
+// A venue is { id, name, lf, lcf, cf, rcf, rf (fence distances in feet), turf, roof, capacity,
+// wallColor }. The default is a plain 330-385-330 park, used until the real one is known.
+export const DEFAULT_VENUE = { id: "none", name: "", lf: 330, lcf: 385, cf: 385, rcf: 385, rf: 330, turf: "Grass", roof: "Open", capacity: 40000, wallColor: "#174a31" };
 
-function buildField(group) {
+// Known wall heights in feet: [first angle, last angle, height] (angle 0 = center, negative = left
+// field). MLB doesn't publish these, so only the famous ones are listed; every other wall is 8 ft.
+const WALLS = {
+  "3": [[-45, -12, 37]],                 // Fenway Park: the Green Monster
+  "2395": [[8, 45, 24]],                 // Oracle Park: the right field arcade
+  "2": [[10, 45, 21]],                   // Camden Yards: right field
+  "31": [[10, 45, 21]],                  // PNC Park: right field
+  "2392": [[-45, -8, 19]],               // Daikin Park: the short left field wall
+  "17": [[-45, 45, 11]],                 // Wrigley Field: the ivy
+  "3313": [[-45, 45, 8]],                // Yankee Stadium
+};
+export const wallHeightAt = (venue, psi) => {
+  for (const [a, b, h] of WALLS[venue.id] || []) if (psi >= a && psi <= b) return h;
+  return 8;
+};
+
+// Distance to the fence at angle psi (degrees from center field, -45..45). The five measured
+// points are joined with smooth curves.
+export function wallRadiusAt(venue, psi) {
+  const pts = [venue.lf, venue.lcf, venue.cf, venue.rcf, venue.rf];
+  const t = (clamp(psi, -45, 45) + 45) / 22.5;          // 0..4
+  const i = Math.min(3, Math.floor(t));
+  return lerp(pts[i], pts[i + 1], ease(t - i));
+}
+
+// Is this wall visibly taller than the standard 8 feet at this angle? (used for tests/labels)
+export const venueSummary = (v) => `${v.lf}-${v.cf}-${v.rf} ft`;
+
+function buildField(group, venue) {
+  const wallRadius = (psi) => wallRadiusAt(venue, psi);
+  const isTurf = /turf/i.test(venue.turf);
   const grass = new THREE.Color(themeVar("--grass") || "#1f5a35");
+  if (isTurf) grass.offsetHSL(-0.01, 0.04, 0.025); // artificial turf: a brighter, flatter green
   const dirt = new THREE.Color(themeVar("--dirt") || "#8a6238");
   const mats = {};
 
   // grass with mowing stripes
-  const stripes = stripeTexture("#" + grass.clone().offsetHSL(0, 0, 0.035).getHexString(), "#" + grass.getHexString());
+  // real grass is mowed in stripes; turf has hardly any
+  const stripes = stripeTexture("#" + grass.clone().offsetHSL(0, 0, isTurf ? 0.012 : 0.035).getHexString(), "#" + grass.getHexString());
   stripes.repeat.set(1, 28);
   mats.grass = new THREE.MeshStandardMaterial({ map: stripes, roughness: 1 });
   const field = new THREE.Mesh(new THREE.CircleGeometry(900, 64), mats.grass);
@@ -235,19 +270,22 @@ function buildField(group) {
   for (let i = 0; i <= steps; i++) {
     const psi = -46 + (92 * i) / steps, r = wallRadius(clamp(psi, -45, 45));
     const x = r * Math.sin(rad(psi)), z = -r * Math.cos(rad(psi));
-    wallPos.push(x, 0, z, x, 9, z);
+    wallPos.push(x, 0, z, x, wallHeightAt(venue, psi), z);
     if (i < steps) { const k = i * 2; wallIdx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
   }
   const wallGeo = new THREE.BufferGeometry();
   wallGeo.setAttribute("position", new THREE.Float32BufferAttribute(wallPos, 3));
   wallGeo.setIndex(wallIdx); wallGeo.computeVertexNormals();
-  group.add(new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: "#174a31", side: THREE.DoubleSide, roughness: 1 })));
+  group.add(new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: venue.wallColor, side: THREE.DoubleSide, roughness: 1 })));
 
+  // bigger parks get taller, deeper stands
+  const big = clamp(((venue.capacity || 40000) - 25000) / 31000, 0, 1);
+  const standDepth = 55 + 45 * big, standTop = 40 + 28 * big;
   const standPos = [], standUv = [], standIdx = [];
   for (let i = 0; i <= steps; i++) {
     const psi = -46 + (92 * i) / steps, r = wallRadius(clamp(psi, -45, 45));
     const s = Math.sin(rad(psi)), c = Math.cos(rad(psi));
-    standPos.push(r * s, 9, -r * c, (r + 75) * s, 52, -(r + 75) * c);
+    standPos.push(r * s, wallHeightAt(venue, clamp(psi, -45, 45)), -r * c, (r + standDepth) * s, standTop, -(r + standDepth) * c);
     standUv.push(i / steps, 0, i / steps, 1);
     if (i < steps) { const k = i * 2; standIdx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
   }
@@ -263,19 +301,31 @@ function buildField(group) {
   for (let i = 0; i <= steps; i++) {
     const psi = -46 + (92 * i) / steps, r = wallRadius(clamp(psi, -45, 45));
     const x = r * Math.sin(rad(psi)), z = -r * Math.cos(rad(psi));
-    tp.push(x, 8.4, z, x, 9.3, z);
+    const h = wallHeightAt(venue, clamp(psi, -45, 45));
+    tp.push(x, h - 0.6, z, x, h + 0.3, z);
     if (i < steps) { const k = i * 2; ti.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
   }
   trim.geometry.setAttribute("position", new THREE.Float32BufferAttribute(tp, 3));
   trim.geometry.setIndex(ti);
   group.add(trim);
 
-  // light towers
+  // light towers, set back with the size of the park
+  const k = venue.cf / 385;
   for (const [x, z] of [[-230, -120], [230, -120], [-150, -340], [150, -340]]) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, 150, 8), new THREE.MeshStandardMaterial({ color: "#8d96a6" }));
-    pole.position.set(x, 75, z); group.add(pole);
+    pole.position.set(x * k, 75, z * k); group.add(pole);
     const panel = new THREE.Mesh(new THREE.BoxGeometry(34, 18, 3), new THREE.MeshBasicMaterial({ color: "#fff7d6" }));
-    panel.position.set(x, 155, z); panel.lookAt(0, 100, 0); group.add(panel);
+    panel.position.set(x * k, 155, z * k); panel.lookAt(0, 100, 0); group.add(panel);
+  }
+
+  // distance signs above the wall: left line, center and right line
+  for (const [psi, feet] of [[-45, venue.lf], [0, venue.cf], [45, venue.rf]]) {
+    const r = wallRadius(psi) + 2;
+    const label = makeLabel(`${feet} ft`);
+    const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: label.texture, fog: false, depthWrite: false }));
+    sign.scale.set(46, 11.5, 1);
+    sign.position.set(r * Math.sin(rad(psi)), wallHeightAt(venue, psi) + 9, -r * Math.cos(rad(psi)));
+    group.add(sign);
   }
   return mats;
 }
@@ -406,10 +456,13 @@ export function createStage3d(container, hooks = {}) {
 
   // ---------------------------------------------------------------- theme (sky, light, grass)
   let sky = null, hemi, sun, fieldMats;
+  let venue = DEFAULT_VENUE, venueKey = null;
   function applyTheme() {
-    const top = themeVar("--sky-top") || "#0b1020";
-    const bottom = themeVar("--sky-bottom") || "#22345c";
-    const day = parseFloat(themeVar("--daylight")) || 0.55;
+    // a closed dome (Tropicana Field) has a roof instead of a sky
+    const closed = venue.roof === "Dome";
+    const top = closed ? "#4a5263" : themeVar("--sky-top") || "#0b1020";
+    const bottom = closed ? "#8d96a8" : themeVar("--sky-bottom") || "#22345c";
+    const day = closed ? 0.8 : parseFloat(themeVar("--daylight")) || 0.55;
     if (sky) world.remove(sky);
     sky = skyDome(top, bottom); world.add(sky);
     scene.fog = new THREE.Fog(bottom, 260, 1500);
@@ -421,7 +474,7 @@ export function createStage3d(container, hooks = {}) {
     sun.intensity = 0.55 + 0.55 * day;
     // rebuild the field so its colors follow the theme
     stadium.clear();
-    fieldMats = buildField(stadium);
+    fieldMats = buildField(stadium, venue);
   }
   applyTheme();
 
@@ -913,6 +966,15 @@ export function createStage3d(container, hooks = {}) {
     setView,
     clearPath,
     refreshTheme() { applyTheme(); },
+    /** Draw this ballpark: its fences, turf, roof and size. Cheap to call on every update. */
+    setVenue(next) {
+      next = { ...DEFAULT_VENUE, ...next };
+      const key = [next.id, next.lf, next.lcf, next.cf, next.rcf, next.rf, next.turf, next.roof, next.wallColor].join("|");
+      if (key === venueKey) return;
+      venueKey = key; venue = next;
+      applyTheme();
+    },
+    get venue() { return venue; },
     /** Advance time by hand (used by tests; the real loop calls this every frame). */
     advance(seconds, step = 1 / 30) { for (let t = 0; t < seconds; t += step) animate(step); renderer.render(scene, camera); },
     /** A PNG of what is on screen right now. */

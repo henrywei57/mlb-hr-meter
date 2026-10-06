@@ -7,7 +7,7 @@
 //
 // Change CACHE_NAME whenever you add a file to APP_FILES, so old caches get cleaned up.
 
-const CACHE_NAME = "hr-meter-v18";
+const CACHE_NAME = "hr-meter-v19";
 
 const APP_FILES = [
   "./",
@@ -28,6 +28,7 @@ const APP_FILES = [
   "src/ui/game.js",
   "src/ui/why.js",
   "src/ui/zone.js",
+  "src/venues.js",
   "src/ui/scene.js",
   "src/ui/lab.js",
   "src/ui/wp.js",
@@ -44,6 +45,7 @@ const APP_FILES = [
   "public/vendor/three.module.min.js",
   "src/ui/diamond.js",
   "public/data/rates.json",
+  "public/data/venues.json",
   "public/data/team-colors.json",
   "public/data/demo_game.json",
   "public/icons/icon-192.png",

@@ -13,6 +13,7 @@ import { countMood, sceneHtml, resultSceneHtml, playResult } from "./scene.js";
 import { playCrack, playCheer } from "../audio.js";
 import { typeColor } from "../pitchdata.js";
 import { webglAvailable } from "./gl.js";
+import { getVenue, wallColor } from "../venues.js";
 
 // The camera views (their positions live in scene3d.js; this is just the buttons)
 const VIEW_BUTTONS = [["catcher", "Catcher"], ["side", "Side"], ["pitcher", "Pitcher"], ["center", "Center field"], ["top", "Overhead"]];
@@ -33,6 +34,7 @@ export function createStage(host, { colors, compact = false }) {
   let lastAtBat = null, lastPitchCount = 0, lastPitch = null, lastHit = null;
   let currentPitches = [];      // the pitches of the at-bat on screen (for "replay this pitch")
   let chipTimer = null;
+  let venue = null, venueId = null; // this game's ballpark (loaded once per venue)
 
   // The "speed gun": a little readout of the pitch's speed and type when it is thrown.
   function showPitchChip(pitch) {
@@ -146,6 +148,12 @@ export function createStage(host, { colors, compact = false }) {
     };
 
     if (mode === "3d" && stage3d) {
+      if (s.venueId && s.venueId !== venueId) {
+        venueId = s.venueId;
+        venue = null;
+        getVenue(venueId).then((v) => { if (venueId === s.venueId && !disposed) { venue = v; if (state) update(state); } });
+      }
+      if (venue) stage3d.setVenue({ ...venue, wallColor: wallColor(venue.id, teamColor(colors, s.home.id)) });
       stage3d.setPlayers(common);
       stage3d.setMood({ balls: s.balls, strikes: s.strikes, spike });
       const pitches = s.current.pitches || [];

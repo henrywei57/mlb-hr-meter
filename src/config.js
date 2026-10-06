@@ -16,4 +16,5 @@ export const MAX_PROBABILITY = 0.6;
 export const MLB_API = "https://statsapi.mlb.com/api";
 export const DEMO_GAME_FILE = "public/data/demo_game.json";
 export const RATES_FILE = "public/data/rates.json";
+export const VENUES_FILE = "public/data/venues.json";
 export const TEAM_COLORS_FILE = "public/data/team-colors.json";

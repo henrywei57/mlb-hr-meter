@@ -17,6 +17,7 @@ import * as THREE from "../../public/vendor/three.module.min.js";
 import { themeVar } from "../theme.js";
 import { countMood, headshotUrl, TAGS, RING } from "./scene.js";
 import { typeColor, callKind } from "../pitchdata.js";
+import { paintWall, loadWallPhoto } from "./walls.js";
 
 const PLATE_W = 17 / 12;             // home plate is 17 inches wide
 const MOUND_Z = -60.5;
@@ -275,18 +276,30 @@ function buildField(group, venue) {
   }
 
   // outfield wall (green with a yellow top), then the stands behind it
-  const wallPos = [], wallIdx = [];
+  const wallPos = [], wallIdx = [], wallUv = [];
   const steps = 30;
   for (let i = 0; i <= steps; i++) {
     const psi = -46 + (92 * i) / steps, r = wallRadius(clamp(psi, -45, 45));
     const x = r * Math.sin(rad(psi)), z = -r * Math.cos(rad(psi));
     wallPos.push(x, 0, z, x, wallHeightAt(venue, psi), z);
+    wallUv.push(i / steps, 0, i / steps, 1);
     if (i < steps) { const k = i * 2; wallIdx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
   }
   const wallGeo = new THREE.BufferGeometry();
   wallGeo.setAttribute("position", new THREE.Float32BufferAttribute(wallPos, 3));
+  wallGeo.setAttribute("uv", new THREE.Float32BufferAttribute(wallUv, 2));
   wallGeo.setIndex(wallIdx); wallGeo.computeVertexNormals();
-  group.add(new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: venue.wallColor, side: THREE.DoubleSide, roughness: 1 })));
+  // The wall is painted per park (padding, signboards, distance numbers, the famous walls). A
+  // real photo at public/venues/walls/<id>.jpg replaces the painting when there is one.
+  const paintedTex = new THREE.CanvasTexture(paintWall(venue));
+  paintedTex.colorSpace = THREE.SRGBColorSpace; paintedTex.anisotropy = 4;
+  const wallMat = new THREE.MeshStandardMaterial({ map: paintedTex, side: THREE.DoubleSide, roughness: 1 });
+  group.add(new THREE.Mesh(wallGeo, wallMat));
+  loadWallPhoto(venue.id, (img) => {
+    const photo = new THREE.Texture(img);
+    photo.colorSpace = THREE.SRGBColorSpace; photo.anisotropy = 4; photo.needsUpdate = true;
+    wallMat.map = photo; wallMat.needsUpdate = true;
+  });
 
   // bigger parks get taller, deeper stands
   const big = clamp(((venue.capacity || 40000) - 25000) / 31000, 0, 1);

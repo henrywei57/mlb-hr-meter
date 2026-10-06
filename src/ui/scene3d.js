@@ -892,6 +892,7 @@ export function createStage3d(container, hooks = {}) {
   setView("catcher", true);
   let follow = null;     // while a hit is flying: { lockPos, look }
 
+  const _eye = new THREE.Vector3(), _dir = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
   function applyCamera(dt) {
     const k = 1 - Math.exp(-dt * 6);
     let daz = goal.az - rig.az; while (daz > Math.PI) daz -= 2 * Math.PI; while (daz < -Math.PI) daz += 2 * Math.PI;
@@ -904,10 +905,24 @@ export function createStage3d(container, hooks = {}) {
       camera.fov += (follow.fov - camera.fov) * (1 - Math.exp(-dt * 3));
     } else if (pov) {
       for (const key of ["x", "y", "z", "yaw", "pitch", "fov"]) povRig[key] += (povGoal[key] - povRig[key]) * k;
-      camera.position.set(povRig.x, povRig.y, povRig.z);
-      const cp = Math.cos(povRig.pitch);
-      camera.lookAt(povRig.x + Math.sin(povRig.yaw) * cp, povRig.y + Math.sin(povRig.pitch), povRig.z - Math.cos(povRig.yaw) * cp);
-      camera.fov = povRig.fov;
+      if (viewName === "batterPov" && batter?.headRig) {
+        // He sees what his head sees: the camera sits in his head and turns as he tracks the ball.
+        // (Dragging still turns it a little further, like looking around.)
+        batter.headRig.updateWorldMatrix(true, false);
+        batter.headRig.getWorldPosition(_eye);
+        batter.headRig.getWorldDirection(_dir);
+        const ex = povGoal.yaw - povDefault.yaw, ep = povGoal.pitch - povDefault.pitch;
+        _dir.applyAxisAngle(_up, -ex);
+        _dir.y += Math.tan(ep) * Math.hypot(_dir.x, _dir.z);
+        camera.position.copy(_eye);
+        camera.lookAt(_eye.x + _dir.x, _eye.y + _dir.y, _eye.z + _dir.z);
+        camera.fov += (povGoal.fov - camera.fov) * k;
+      } else {
+        camera.position.set(povRig.x, povRig.y, povRig.z);
+        const cp = Math.cos(povRig.pitch);
+        camera.lookAt(povRig.x + Math.sin(povRig.yaw) * cp, povRig.y + Math.sin(povRig.pitch), povRig.z - Math.cos(povRig.yaw) * cp);
+        camera.fov = povRig.fov;
+      }
     } else {
       const ce = Math.cos(rig.el);
       camera.position.set(rig.tx + rig.dist * ce * Math.sin(rig.az), rig.ty + rig.dist * Math.sin(rig.el), rig.tz + rig.dist * ce * Math.cos(rig.az));

@@ -37,8 +37,64 @@ export function pitchesOf(play, limit = Infinity) {
       code: e.details?.code,
       inPlay: !!e.details?.isInPlay,
       path: pathOf(e.pitchData),
+      ...absOf(e),
     };
   });
+}
+
+// ---------------------------------------------------------------- ABS (robot umpire) challenges
+// MLB marks a challenged pitch with `reviewDetails`. The pitch's own call is the FINAL one, so if
+// the challenge was overturned the umpire's original call was the opposite.
+function absOf(event) {
+  const r = event.reviewDetails;
+  if (!r) return { challenge: null, umpCall: callKind(event.details) };
+  const final = callKind(event.details);
+  const original = r.isOverturned ? (final === "strike" ? "ball" : "strike") : final;
+  return {
+    challenge: {
+      teamId: r.challengeTeamId,
+      player: r.player?.fullName || "",
+      overturned: !!r.isOverturned,
+      inProgress: !!r.inProgress,
+      from: original,   // what the umpire called on the field
+      to: final,        // what stood after the challenge
+    },
+    umpCall: original,
+  };
+}
+
+/** What the plate umpire signals for a pitch: "strike", "ball", "foul", or null (in play, etc.). */
+export function callKind(details) {
+  if (!details || details.isInPlay) return null;
+  switch (details.code) {
+    case "C": case "S": case "W": case "T": case "M": case "O": case "Q": return "strike";
+    case "F": case "L": return "foul";
+    case "B": case "*B": case "P": case "I": case "V": return "ball";
+    default: return details.isBall ? "ball" : details.isStrike ? "strike" : null;
+  }
+}
+
+/**
+ * The ABS scoreboard from the pitch log (the groups from groupByInning): each team has 2 challenges, keeps one when it wins and
+ * loses it when it doesn't. Returns { away: {left, won, lost}, home: {...}, log: [...] } where
+ * `log` lists every challenge so far in order.
+ */
+export function absBoard(pitchLog, away, home) {
+  const tally = () => ({ left: 2, won: 0, lost: 0 });
+  const board = { away: tally(), home: tally(), log: [] };
+  for (const row of (pitchLog || []).flatMap((g) => g.rows)) {
+    for (const p of row.pitches) {
+      const c = p.challenge;
+      if (!c) continue;
+      const side = c.teamId === home.id ? board.home : c.teamId === away.id ? board.away : (row.isTop ? board.away : board.home);
+      if (!c.inProgress) {
+        if (c.overturned) side.won += 1; else { side.lost += 1; side.left = Math.max(0, side.left - 1); }
+      }
+      board.log.push({ ...c, label: row.label, batter: row.batter.name, pitcher: row.pitcher.name, team: side === board.home ? "home" : "away", n: p.n });
+    }
+  }
+  board.any = board.log.length > 0;
+  return board;
 }
 
 // ---------------------------------------------------------------- the pitch log

@@ -25,6 +25,15 @@ function look(pitch) {
   }
 }
 
+const word = (k) => (k === "strike" ? "strike" : k === "ball" ? "ball" : k);
+function challengeText(p) {
+  const c = p.challenge;
+  if (!c) return "";
+  const who = c.player ? ` by ${esc(c.player)}` : "";
+  if (c.inProgress) return `<br><span class="zone-abs">ABS challenge${who}: under review</span>`;
+  return `<br><span class="zone-abs">ABS challenge${who}: ${c.overturned ? `overturned, ${word(c.from)} became a ${word(c.to)}` : `upheld, still a ${word(c.to)}`}</span>`;
+}
+
 export function zoneHtml(pitches, openPitch, actions) {
   const shown = (pitches || []).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.z));
   const last = pitches?.find((p) => Number.isFinite(p.top));
@@ -46,13 +55,14 @@ export function zoneHtml(pitches, openPitch, actions) {
     const cx = sx(p.x), cy = sz(p.z);
     const isLast = p.n === pitches[pitches.length - 1].n;
     return `<g class="zone-pitch ${isLast ? "latest" : ""}" data-pitch="${p.n}" tabindex="0" role="button">
+      ${p.challenge ? `<circle cx="${cx}" cy="${cy}" r="${BALL_R * PX + 9}" fill="none" stroke="#ffcf4a" stroke-width="2" stroke-dasharray="3 3"/>` : ""}
       <circle cx="${cx}" cy="${cy}" r="${BALL_R * PX + 3}" fill="${color}" stroke="#10131a" stroke-width="1.5"/>
       <text x="${cx}" y="${cy + 4}" text-anchor="middle">${p.n}</text></g>`;
   }).join("");
 
   const picked = shown.find((p) => p.n === openPitch) || shown[shown.length - 1];
   const detail = picked
-    ? `<p class="zone-detail"><b>Pitch ${picked.n}</b> · ${esc(look(picked).text)}${picked.type ? ` · ${esc(picked.type)}` : ""}${picked.speed ? ` · ${Math.round(picked.speed)} mph` : ""}</p>`
+    ? `<p class="zone-detail"><b>Pitch ${picked.n}</b> · ${esc(look(picked).text)}${picked.type ? ` · ${esc(picked.type)}` : ""}${picked.speed ? ` · ${Math.round(picked.speed)} mph` : ""}${challengeText(picked)}</p>`
     : `<p class="zone-detail muted">No pitches yet this at-bat.</p>`;
 
   return `
@@ -65,6 +75,6 @@ export function zoneHtml(pitches, openPitch, actions) {
     </svg>
     ${detail}
     ${picked && actions ? actions(picked) : ""}
-    <p class="zone-legend"><i style="background:#ff5b6e"></i>Called strike <i style="background:#ff9d4d"></i>Swinging <i style="background:#ffcf4a"></i>Foul <i style="background:#6cb4ff"></i>Ball <i style="background:#fff"></i>In play</p>
+    <p class="zone-legend"><i style="background:#ff5b6e"></i>Called strike <i style="background:#ff9d4d"></i>Swinging <i style="background:#ffcf4a"></i>Foul <i style="background:#6cb4ff"></i>Ball <i style="background:#fff"></i>In play <i class="ring"></i>ABS challenge</p>
     <p class="note">Catcher's view. The box is this batter's real zone; the dashed edge is one ball width outside it. Tap a pitch for details.</p>`;
 }

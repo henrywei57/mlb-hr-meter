@@ -16,7 +16,7 @@
 import * as THREE from "../../public/vendor/three.module.min.js";
 import { themeVar } from "../theme.js";
 import { countMood, headshotUrl, TAGS, RING } from "./scene.js";
-import { typeColor } from "../pitchdata.js";
+import { typeColor, callKind } from "../pitchdata.js";
 
 const PLATE_W = 17 / 12;             // home plate is 17 inches wide
 const MOUND_Z = -60.5;
@@ -30,11 +30,21 @@ const rad = (deg) => (deg * Math.PI) / 180;
 // ---------------------------------------------------------------- camera views
 // pos = where the camera is, target = what it looks at. "fov" is how wide it sees (degrees).
 export const VIEWS = {
-  catcher: { label: "Catcher", pos: [0, 9, 27], target: [0, 4.2, -45], fov: 38 },
+  catcher: { label: "Broadcast", pos: [0, 9, 27], target: [0, 4.2, -45], fov: 38, ghost: true },
   side: { label: "Side", pos: [62, 9, -32], target: [0, 4.5, -30], fov: 34 },
   pitcher: { label: "Pitcher", pos: [5, 8, -69], target: [0, 3.5, 0], fov: 26 },
   center: { label: "Center field", pos: [0, 17, -215], target: [0, 4, 0], fov: 20 },
   top: { label: "Overhead", pos: [0, 270, -48], target: [0, 0, -62], fov: 44 },
+  // Point-of-view cameras: the camera sits where that person's eyes are and you look around from
+  // there (drag to turn your head, scroll to zoom). `hide` is the person you are looking out of.
+  umpPov: { label: "Ump", pov: true, hide: "ump", pos: [1.9, 7.2, 7.2], target: [0, 3.2, -60], fov: 36 },
+  catcherPov: { label: "Catcher", pov: true, hide: "catcher", pos: [0, 3.3, 2.6], target: [0, 4.2, -60], fov: 52 },
+  batterPov: { label: "Batter", pov: true, hide: "batter", pos: [0, 6.6, -0.7], target: [0, 5, -60], fov: 55 }, // x set from the batter's side
+  firstPov: { label: "1st base", pov: true, pos: [58, 6, -56], target: [-4, 4, -12], fov: 62 },
+  secondPov: { label: "2nd base", pov: true, pos: [16, 6, -112], target: [0, 4, 0], fov: 44 },
+  thirdPov: { label: "3rd base", pov: true, pos: [-58, 6, -56], target: [4, 4, -12], fov: 62 },
+  shortPov: { label: "Shortstop", pov: true, pos: [-26, 6, -98], target: [0, 4, 0], fov: 42 },
+  outfieldPov: { label: "Outfield", pov: true, pos: [0, 6.5, -300], target: [0, 4, 0], fov: 20 },  // depth set from the park
 };
 
 // ---------------------------------------------------------------- the pose of each mood
@@ -480,6 +490,25 @@ export function createStage3d(container, hooks = {}) {
 
   // ---------------------------------------------------------------- players
   let batter = null, pitcher = null;
+
+  // The plate umpire and the catcher, crouched behind home plate. They face the pitcher.
+  const ump = buildPlayer({ jersey: "#232a38", scale: 1.3, isBatter: false });
+  const catcher = buildPlayer({ jersey: "#4a5266", scale: 1.2, isBatter: false });
+  for (const [who, x, z, tint] of [[ump, 1.9, 5.6, "#c9ced8"], [catcher, 0, 2.7, "#d9dde3"]]) {
+    who.root.position.set(x, 0, z);
+    who.root.rotation.y = Math.PI;
+    who.ring.visible = false; who.label.visible = false;
+    who.heldBall.visible = false; who.glove.visible = false;
+    who.mats.pants.color.set(tint);
+    setHead(who, 0); // MLB's generic head photo
+    world.add(who.root);
+  }
+  ump.body.position.y = -0.9; ump.torsoGroup.rotation.x = 0.3;      // leaning in over the catcher
+  catcher.body.position.y = -1.9; catcher.torsoGroup.rotation.x = 0.1; // in a deep crouch
+  catcher.arms[1].rotation.set(-1.35, 0, 0.1);                       // mitt held out toward the pitcher
+  const mitt = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), new THREE.MeshStandardMaterial({ color: "#8a5a2b", roughness: 0.9 }));
+  mitt.position.set(0, -1.9, 0.2); catcher.arms[1].add(mitt);
+  ump.arms[0].rotation.set(-0.25, 0, 0); ump.arms[1].rotation.set(-0.25, 0, 0);
   let cfg = null; // current players/colors
   function rebuildPlayers(next) {
     if (batter) { world.remove(batter.root); batter.links.forEach(({ link, hand }) => world.remove(link, hand)); }
@@ -510,6 +539,9 @@ export function createStage3d(container, hooks = {}) {
     setHead(pitcher, next.pitcherId);
     cfg = { ...next };
     pose = null;
+    catcher.mats.jersey.color.set(next.pitchColor); // the catcher wears the fielding team's color
+    if (VIEWS[viewName]?.pov) setView(viewName, true); // the batter may have changed sides
+    else applyVisibility();
   }
 
   // ---------------------------------------------------------------- mood poses (eased each frame)
@@ -643,7 +675,7 @@ export function createStage3d(container, hooks = {}) {
     const arrive = c ? pitchPosition(c, plateTime) : new THREE.Vector3(pitch?.x ?? 0, pitch?.z ?? 2.5, -1.4);
     const dur = clamp(plateTime * 3.4, 1.0, 1.7);   // slow motion so you can follow it
     const windup = 0.5;
-    anim = { kind: "pitch", t: 0, windup, dur, hand, arrive, c, plateTime, released: false, showPath };
+    anim = { kind: "pitch", t: 0, windup, dur, hand, arrive, c, plateTime, released: false, showPath, pitch, stopAtBat };
     clearTrail();
     if (showPath && !stopAtBat) {
       // the route the ball will take: from the pitcher's hand, then MLB's tracked path to the catcher
@@ -660,6 +692,48 @@ export function createStage3d(container, hooks = {}) {
       clearPath();
     }
     return windup + dur + 0.5; // how long until the ball has landed (seconds)
+  }
+
+  // ---------------------------------------------------------------- the umpire's call
+  // When the ball reaches the plate the umpire signals it: a raised fist for a strike (called or
+  // swinging), a flat "ball", arms out for a foul. If MLB's robot umpire (ABS) was asked to check
+  // the pitch, the original call is followed by the challenge and its result.
+  let callRun = null; // { steps, t, i }
+  const CALL_TEXT = { strike: "STRIKE", ball: "BALL", foul: "FOUL" };
+  function callPitch(pitch) {
+    if (!pitch) return;
+    const kind = pitch.umpCall || callKind({ code: pitch.code, isInPlay: pitch.inPlay });
+    if (!kind) return; // in play: no call
+    const steps = [{ at: 0, len: 1.5, kind, text: CALL_TEXT[kind], sub: pitch.challenge ? "umpire's call" : "" }];
+    const c = pitch.challenge;
+    if (c) {
+      steps.push({ at: 1.6, len: 1.5, kind: "abs", text: "ABS CHALLENGE", sub: c.player ? `${c.player} taps his helmet` : "" });
+      steps.push(c.inProgress
+        ? { at: 3.2, len: 1.5, kind: "abs", text: "UNDER REVIEW", sub: "" }
+        : { at: 3.2, len: 2.2, kind: c.to, text: c.overturned ? `OVERTURNED: ${CALL_TEXT[c.to] || ""}` : `CALL STANDS: ${CALL_TEXT[c.to] || ""}`, sub: c.overturned ? "the robot umpire says so" : "", result: true });
+    }
+    callRun = { steps, t: 0, shown: -1 };
+  }
+  function stepCall(dt) {
+    // arms at rest unless a call is on
+    let step = null;
+    if (callRun) {
+      callRun.t += dt;
+      step = [...callRun.steps].reverse().find((st) => callRun.t >= st.at) || null;
+      const end = callRun.steps[callRun.steps.length - 1];
+      if (callRun.t > end.at + end.len) { callRun = null; step = null; hooks.onCallEnd?.(); }
+    }
+    const [right, left] = ump.arms;
+    right.rotation.set(-0.25, 0, 0); left.rotation.set(-0.25, 0, 0);
+    if (!step) return;
+    const idx = callRun.steps.indexOf(step);
+    if (callRun.shown !== idx) { callRun.shown = idx; hooks.onCall?.(step, { hold: step.len }); }
+    const u = callRun.t - step.at;
+    const pump = Math.sin(u * 16) * 0.12 * Math.max(0, 1 - u);
+    if (step.kind === "strike") right.rotation.set(-rad(165) + pump, 0, 0);                  // the fist goes up
+    else if (step.kind === "ball") left.rotation.set(-0.5, 0, -0.9 + Math.sin(u * 5) * 0.08); // a flat hand out to the side
+    else if (step.kind === "foul") { right.rotation.set(-0.3, 0, -1.35); left.rotation.set(-0.3, 0, 1.35); } // arms out
+    else if (step.kind === "abs") { right.rotation.set(-0.2, 0, -1.5); left.rotation.set(-0.2, 0, 1.5); }   // a "T"
   }
 
   function pitchBallAt(frac) {
@@ -734,16 +808,60 @@ export function createStage3d(container, hooks = {}) {
   const rig = { az: 0, el: 0, dist: 50, tx: 0, ty: 0, tz: 0, fov: 38 };
   const goal = { ...rig };
   let viewName = "catcher";
+  let pov = false, povDefault = null;   // true while a point-of-view camera is on
   const fromView = (v) => {
     const [px, py, pz] = v.pos, [tx, ty, tz] = v.target;
     const dx = px - tx, dy = py - ty, dz = pz - tz, d = Math.hypot(dx, dy, dz);
     return { az: Math.atan2(dx, dz), el: Math.asin(dy / d), dist: d, tx, ty, tz, fov: v.fov };
   };
+  // POV cameras: the camera stays at the eye; yaw/pitch (radians) are where he is looking.
+  const povRig = { x: 0, y: 6, z: 0, yaw: 0, pitch: 0, fov: 40 };
+  const povGoal = { ...povRig };
+  const lookAngles = (from, to) => {
+    const dx = to[0] - from[0], dy = to[1] - from[1], dz = to[2] - from[2];
+    return { yaw: Math.atan2(dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)) };
+  };
+  // where a POV camera really goes (the batter's and the outfielder's depend on the game)
+  function povSpot(name) {
+    const v = { ...VIEWS[name] };
+    if (name === "batterPov" && cfg) {
+      const m = cfg.batSide === "R" ? 1 : -1;            // his x: a righty stands on the viewer's left
+      v.pos = [-m * 3.1, 6.6, -0.7];
+    }
+    if (name === "outfieldPov") v.pos = [0, 6.5, -Math.max(220, venue.cf - 70)];
+    return v;
+  }
+  // hide the person whose eyes we are looking out of; ghost the crew in the broadcast view
+  function applyVisibility() {
+    const v = VIEWS[viewName];
+    const hide = v?.hide;
+    if (batter) { batter.root.visible = hide !== "batter"; batter.links.forEach(({ link, hand }) => { link.visible = hand.visible = hide !== "batter"; }); }
+    ump.root.visible = hide !== "ump";
+    catcher.root.visible = hide !== "catcher";
+    const a = v?.ghost ? 0.22 : 1;                         // in the broadcast view they would block the strike zone
+    for (const who of [ump, catcher]) who.root.traverse((o) => {
+      for (const mat of [].concat(o.material || [])) {
+        if (mat.userData.base === undefined) { mat.userData.base = mat.opacity; mat.userData.wasT = mat.transparent; }
+        mat.transparent = a < 1 || mat.userData.wasT;
+        mat.opacity = mat.userData.base * a;
+      }
+    });
+  }
   function setView(name, instant = false) {
     if (!VIEWS[name]) return;
     viewName = name;
-    Object.assign(goal, fromView(VIEWS[name]));
-    if (instant) Object.assign(rig, goal);
+    if (VIEWS[name].pov) {
+      const v = povSpot(name);
+      Object.assign(povGoal, { x: v.pos[0], y: v.pos[1], z: v.pos[2], fov: v.fov, ...lookAngles(v.pos, v.target) });
+      povDefault = { ...povGoal };
+      if (instant || !pov) Object.assign(povRig, povGoal);
+      pov = true;
+    } else {
+      pov = false;
+      Object.assign(goal, fromView(VIEWS[name]));
+      if (instant) Object.assign(rig, goal);
+    }
+    applyVisibility();
     hooks.onView?.(name);
   }
   setView("catcher", true);
@@ -759,6 +877,12 @@ export function createStage3d(container, hooks = {}) {
       follow.look.lerp(follow.target, 1 - Math.exp(-dt * 4));
       camera.lookAt(follow.look);
       camera.fov += (follow.fov - camera.fov) * (1 - Math.exp(-dt * 3));
+    } else if (pov) {
+      for (const key of ["x", "y", "z", "yaw", "pitch", "fov"]) povRig[key] += (povGoal[key] - povRig[key]) * k;
+      camera.position.set(povRig.x, povRig.y, povRig.z);
+      const cp = Math.cos(povRig.pitch);
+      camera.lookAt(povRig.x + Math.sin(povRig.yaw) * cp, povRig.y + Math.sin(povRig.pitch), povRig.z - Math.cos(povRig.yaw) * cp);
+      camera.fov = povRig.fov;
     } else {
       const ce = Math.cos(rig.el);
       camera.position.set(rig.tx + rig.dist * ce * Math.sin(rig.az), rig.ty + rig.dist * Math.sin(rig.el), rig.tz + rig.dist * ce * Math.cos(rig.az));
@@ -783,6 +907,10 @@ export function createStage3d(container, hooks = {}) {
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
       goal.dist = clamp(pinchDist0 * (pinchStart / Math.max(d, 1)), 10, 400);
+    } else if (!follow && pov) {
+      // turn your head: dragging right looks left, like grabbing the picture
+      povGoal.yaw = clamp(povGoal.yaw - dx * 0.004 * (povGoal.fov / 40), povDefault.yaw - 2.4, povDefault.yaw + 2.4);
+      povGoal.pitch = clamp(povGoal.pitch + dy * 0.003 * (povGoal.fov / 40), -1.0, 0.9);
     } else if (!follow) {
       goal.az -= dx * 0.008;
       if (e.pointerType === "mouse" || Math.abs(dy) > Math.abs(dx) * 2) goal.el = clamp(goal.el + dy * 0.006, 0.03, 1.52);
@@ -790,7 +918,10 @@ export function createStage3d(container, hooks = {}) {
     }
   };
   const onUp = (e) => { pointers.delete(e.pointerId); };
-  const onWheel = (e) => { e.preventDefault(); goal.dist = clamp(goal.dist * Math.exp(e.deltaY * 0.0012), 10, 400); viewName = "custom"; hooks.onView?.("custom"); };
+  const onWheel = (e) => {
+    e.preventDefault();
+    if (pov) { povGoal.fov = clamp(povGoal.fov * Math.exp(e.deltaY * 0.001), 8, 90); return; }
+    goal.dist = clamp(goal.dist * Math.exp(e.deltaY * 0.0012), 10, 400); viewName = "custom"; hooks.onView?.("custom"); };
   const onDbl = () => setView("catcher");
   canvas.addEventListener("pointerdown", onDown);
   canvas.addEventListener("pointermove", onMove);
@@ -836,6 +967,7 @@ export function createStage3d(container, hooks = {}) {
       }
     }
     if (anim) stepAnim(dt);
+    stepCall(dt);
     if (pathObj && Number.isFinite(pathObj.life)) {
       pathObj.life -= dt;
       pathObj.mesh.material.opacity = clamp(pathObj.life / 1.2, 0, 0.95);
@@ -870,6 +1002,7 @@ export function createStage3d(container, hooks = {}) {
         anim.ballPos = p;
         if (anim.kind === "pitch" && anim.showPath) setPathProgress(flightT / anim.dur);
       }
+      if (anim.kind === "pitch" && !anim.stopAtBat && !anim.called && flightT >= anim.dur) { anim.called = true; callPitch(anim.pitch); }
       if (anim.kind === "pitch" && flightT > anim.dur + 0.5) {
         ball.visible = false; clearTrail(); pitcher.heldBall.visible = true;
         if (anim.showPath) { setPathProgress(1); holdPath(6); }

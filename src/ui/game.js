@@ -11,6 +11,7 @@ import { THEMES, currentTheme, nextTheme, applyTheme } from "../theme.js";
 import { diamondSvg } from "./diamond.js";
 import { whyHtml } from "./why.js";
 import { zoneHtml } from "./zone.js";
+import { absBoard } from "../pitchdata.js";
 import { drawWinProbability } from "./wp.js";
 import { loadSaved, storeSaved, makeSaved, toggleSaved, isSaved, pitchId } from "../saved.js";
 import { pitchKind, resultText, fastestKeys, typeColor } from "../pitchdata.js";
@@ -111,6 +112,24 @@ export function showGame(root, { gamePk, rates: defaultRates, colors, makeSource
   let whatIfCount = null;         // count picked in the "try another count" grid, e.g. "3-1"
 
   // ---------------------------------------------------------------- drawing
+  // The ABS (automated ball-strike) challenge board: challenges left for each team, and the log.
+  function absBoardHtml(s) {
+    if (!s.pitchLog) return "";
+    const abs = absBoard(s.pitchLog, s.away, s.home);
+    const pips = (side) => [0, 1].map((i) => `<i class="abs-pip ${i < side.left ? "on" : ""}"></i>`).join("");
+    const team = (t, side, cls) => `<span class="abs-team ${cls}" title="${esc(t.name)}: ${side.left} challenge${side.left === 1 ? "" : "s"} left, ${side.won} won, ${side.lost} lost">${esc(t.abbr || t.name)} ${pips(side)}</span>`;
+    const word = (k) => (k === "strike" ? "Strike" : k === "ball" ? "Ball" : "?");
+    const log = abs.log.slice(-3).reverse().map((c) => {
+      const t = c.team === "home" ? s.home : s.away;
+      const result = c.inProgress ? "under review" : c.overturned ? `overturned: ${word(c.from)} → ${word(c.to)}` : `upheld: stays a ${word(c.to).toLowerCase()}`;
+      return `<li class="${c.inProgress ? "pending" : c.overturned ? "won" : "lost"}"><b>${esc(t.abbr || t.name)}</b> ${esc(c.label)} · ${esc(c.player || "challenge")} · ${result}</li>`;
+    }).join("");
+    return `<div class="abs-board" aria-label="ABS challenges">
+      <div class="abs-head"><span class="abs-title">ABS challenges left</span>${team(s.away, abs.away, "away")}${team(s.home, abs.home, "home")}</div>
+      ${log ? `<ul class="abs-log">${log}</ul>` : `<p class="abs-none">No challenges yet. A team keeps its challenge when it wins one.</p>`}
+    </div>`;
+  }
+
   function drawScore(s) {
     const awayColor = teamColor(colors, s.away.id);
     const homeColor = teamColor(colors, s.home.id);
@@ -133,7 +152,8 @@ export function showGame(root, { gamePk, rates: defaultRates, colors, makeSource
           ${s.isLive ? `<div class="outs">${outsDots}<span>${s.outs} out${s.outs === 1 ? "" : "s"}</span></div>
           <div class="count">Count <b>${s.balls}-${s.strikes}</b> <span class="muted">(balls-strikes)</span></div>` : ""}
         </div>
-      </div>`;
+      </div>
+      ${absBoardHtml(s)}`;
     const chip = $("chip");
     chip.textContent = s.isFinal ? "Final" : source.isReplay ? "Replay" : s.isLive ? "Live" : s.statusLabel;
     chip.className = "chip " + (s.isLive && !source.isReplay ? "live" : "");

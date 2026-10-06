@@ -29,6 +29,9 @@ const ease = (t) => t * t * (3 - 2 * t);
 const rad = (deg) => (deg * Math.PI) / 180;
 
 // ---------------------------------------------------------------- camera views
+// Eye height of a fielder: the head of a 1.3x player (the same size as the batter), in feet. Every
+// fielder's point of view sits at this height and looks straight ahead (level), like a real head.
+const HEAD = 7.3;
 // pos = where the camera is, target = what it looks at. "fov" is how wide it sees (degrees).
 export const VIEWS = {
   catcher: { label: "Broadcast", pos: [0, 9, 27], target: [0, 4.2, -45], fov: 38, ghost: true },
@@ -38,14 +41,14 @@ export const VIEWS = {
   top: { label: "Overhead", pos: [0, 270, -48], target: [0, 0, -62], fov: 44 },
   // Point-of-view cameras: the camera sits where that person's eyes are and you look around from
   // there (drag to turn your head, scroll to zoom). `hide` is the person you are looking out of.
-  umpPov: { label: "Ump", pov: true, hide: "ump", pos: [1.9, 7.2, 7.2], target: [0, 3.2, -60], fov: 36 },
-  catcherPov: { label: "Catcher", pov: true, hide: "catcher", pos: [0, 3.3, 2.6], target: [0, 4.2, -60], fov: 52 },
+  umpPov: { label: "Ump", pov: true, hide: "ump", pos: [1.9, 6.4, 7.2], target: [0, 5.4, -60], fov: 36 },
+  catcherPov: { label: "Catcher", pov: true, hide: "catcher", pos: [0, 4.5, 2.6], target: [0, 4.6, -60], fov: 52 },
   batterPov: { label: "Batter", pov: true, hide: "batter", pos: [0, 6.6, -0.7], target: [0, 5, -60], fov: 55 }, // x set from the batter's side
-  firstPov: { label: "1st base", pov: true, pos: [58, 6, -56], target: [-4, 4, -12], fov: 62 },
-  secondPov: { label: "2nd base", pov: true, pos: [16, 6, -112], target: [0, 4, 0], fov: 44 },
-  thirdPov: { label: "3rd base", pov: true, pos: [-58, 6, -56], target: [4, 4, -12], fov: 62 },
-  shortPov: { label: "Shortstop", pov: true, pos: [-26, 6, -98], target: [0, 4, 0], fov: 42 },
-  outfieldPov: { label: "Outfield", pov: true, pos: [0, 6.5, -300], target: [0, 4, 0], fov: 20 },  // depth set from the park
+  firstPov: { label: "1st base", pov: true, pos: [58, HEAD, -56], target: [-4, HEAD, -12], fov: 62 },
+  secondPov: { label: "2nd base", pov: true, pos: [16, HEAD, -112], target: [0, HEAD, 0], fov: 44 },
+  thirdPov: { label: "3rd base", pov: true, pos: [-58, HEAD, -56], target: [4, HEAD, -12], fov: 62 },
+  shortPov: { label: "Shortstop", pov: true, pos: [-26, HEAD, -98], target: [0, HEAD, 0], fov: 42 },
+  outfieldPov: { label: "Outfield", pov: true, pos: [0, HEAD, -300], target: [0, HEAD, 0], fov: 20 },  // depth set from the park
 };
 
 // ---------------------------------------------------------------- the pose of each mood
@@ -853,7 +856,7 @@ export function createStage3d(container, hooks = {}) {
       const m = cfg.batSide === "R" ? 1 : -1;            // his x: a righty stands on the viewer's left
       v.pos = [-m * 3.1, 6.6, -0.7];
     }
-    if (name === "outfieldPov") v.pos = [0, 6.5, -Math.max(220, venue.cf - 70)];
+    if (name === "outfieldPov") v.pos = [0, HEAD, -Math.max(220, venue.cf - 70)];
     return v;
   }
   // hide the person whose eyes we are looking out of; ghost the crew in the broadcast view

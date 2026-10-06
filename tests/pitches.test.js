@@ -132,3 +132,29 @@ test("absBoard: a won challenge is kept, a lost one is spent", () => {
   assert.equal(board.away.left, 1);
   assert.equal(board.log.length, 3);
 });
+
+// ---- the pitch tester
+import { customPitch, syntheticPath, PITCH_TYPES } from "../src/pitchdata.js";
+
+test("syntheticPath crosses the plate where you asked", () => {
+  for (const type of Object.keys(PITCH_TYPES)) {
+    const c = syntheticPath(type, 0.4, 2.2, "R");
+    const T = c.plateTime;
+    const x = c.x0 + c.vX0 * T + 0.5 * c.aX * T * T;
+    const z = c.z0 + c.vZ0 * T + 0.5 * c.aZ * T * T;
+    const y = c.y0 + c.vY0 * T + 0.5 * c.aY * T * T;
+    assert.ok(Math.abs(x - 0.4) < 1e-6 && Math.abs(z - 2.2) < 1e-6 && Math.abs(y) < 1e-6, type);
+    assert.ok(T > 0.3 && T < 0.6, `${type} plate time ${T}`);
+  }
+});
+
+test("customPitch: an overturned challenge means the umpire first called the opposite", () => {
+  const p = customPitch({ typeCode: "SL", x: 0.9, z: 2, call: "ball", abs: "overturned" });
+  assert.equal(p.umpCall, "strike");
+  assert.deepEqual([p.challenge.from, p.challenge.to, p.challenge.overturned], ["strike", "ball", true]);
+  const u = customPitch({ typeCode: "FF", x: 0, z: 2.5, call: "strike", abs: "upheld" });
+  assert.equal(u.umpCall, "strike");
+  assert.equal(u.challenge.overturned, false);
+  // swings cannot be challenged
+  assert.equal(customPitch({ typeCode: "FF", x: 0, z: 2, call: "swing", abs: "overturned" }).challenge, null);
+});

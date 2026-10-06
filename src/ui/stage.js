@@ -11,7 +11,8 @@ import { getSettings, saveSettings } from "../settings.js";
 import { teamColor, esc, pct } from "../util.js";
 import { countMood, sceneHtml, resultSceneHtml, playResult } from "./scene.js";
 import { playCrack, playCheer } from "../audio.js";
-import { typeColor } from "../pitchdata.js";
+import { typeColor, PITCH_TYPES, customPitch } from "../pitchdata.js";
+import { pickerHtml, pickerPoint } from "./zone.js";
 import { webglAvailable } from "./gl.js";
 import { getVenue, wallColor } from "../venues.js";
 
@@ -36,6 +37,7 @@ export function createStage(host, { colors, compact = false }) {
   let lastAtBat = null, lastPitchCount = 0, lastPitch = null, lastHit = null;
   let currentPitches = [];      // the pitches of the at-bat on screen (for "replay this pitch")
   let chipTimer = null, callTimer = null;
+  const tester = { x: 0, z: 2.5 };  // the pitch tester's chosen location (feet)
   let venue = null, venueId = null; // this game's ballpark (loaded once per venue)
 
   // The "speed gun": a little readout of the pitch's speed and type when it is thrown.
@@ -81,7 +83,18 @@ export function createStage(host, { colors, compact = false }) {
           <button type="button" class="chip-btn" data-stage="pitch">Replay pitch</button>
           ${compact ? "" : `<button type="button" class="chip-btn" data-stage="hit">Replay last hit</button>`}
           <button type="button" class="chip-btn" data-stage="snap">Snapshot</button>
+          <button type="button" class="chip-btn" data-stage="test" aria-expanded="false">Test a pitch</button>
           ${toggle}
+        </div>
+        <div class="pitch-test" hidden>
+          <div class="pt-row">
+            <label>Pitch <select data-pt="type">${Object.entries(PITCH_TYPES).map(([k, t]) => `<option value="${k}">${t.name}</option>`).join("")}</select></label>
+            <label>Call <select data-pt="call"><option value="strike">Called strike</option><option value="ball">Ball</option><option value="swing">Swinging strike</option><option value="foul">Foul</option></select></label>
+            <label>ABS challenge <select data-pt="abs"><option value="none">None</option><option value="overturned">Challenge: overturned</option><option value="upheld">Challenge: upheld</option></select></label>
+          </div>
+          <div class="pt-pick"></div>
+          <p class="note pt-where"></p>
+          <button type="button" class="chip-btn pt-go" data-stage="throw">Throw it</button>
         </div>
         <div class="stage-caption"></div>
         <p class="note stage-tip">Drag to look around. Pinch or scroll to zoom. Double-tap to reset. In a point of view, drag to turn your head.</p>`;
@@ -241,6 +254,13 @@ export function createStage(host, { colors, compact = false }) {
       else if (webglAvailable()) { build("2d"); ready = start3d(); }
     } else if (action === "pitch" && stage3d && lastPitch) {
       stage3d.throwPitch(lastPitch, { showPath: true }); showPitchChip(lastPitch);
+    } else if (action === "test") {
+      const panel = host.querySelector(".pitch-test");
+      panel.hidden = !panel.hidden;
+      tool.setAttribute("aria-expanded", String(!panel.hidden));
+      if (!panel.hidden) drawPicker();
+    } else if (action === "throw" && stage3d) {
+      throwTest();
     } else if (action === "hit" && stage3d && lastHit) {
       busyUntil = Date.now() + stage3d.playHit(lastHit) + 400;
     } else if (action === "snap" && stage3d) {
@@ -254,6 +274,54 @@ export function createStage(host, { colors, compact = false }) {
     }
   }
   host.addEventListener("click", onClick);
+
+  // ---------------------------------------------------------------- the pitch tester
+  const field = (name) => host.querySelector(`[data-pt="${name}"]`);
+  function drawPicker() {
+    const pick = host.querySelector(".pt-pick");
+    if (!pick) return;
+    pick.innerHTML = pickerHtml(tester.x, tester.z, zoneEdges().top, zoneEdges().bottom);
+    const inZone = Math.abs(tester.x) <= 17 / 24 && tester.z >= zoneEdges().bottom && tester.z <= zoneEdges().top;
+    host.querySelector(".pt-where").textContent =
+      `Crosses ${Math.abs(tester.x * 12).toFixed(0)} in. ${tester.x < 0 ? "left" : "right"} of the plate center, ${(tester.z * 12).toFixed(0)} in. up (${inZone ? "in" : "outside"} the zone). Tap the zone to move it.`;
+  }
+  // the batter's real zone if we know it, otherwise an average one
+  function zoneEdges() {
+    const p = (state?.current?.pitches || []).find((q) => Number.isFinite(q.top));
+    return { top: p?.top ?? 3.4, bottom: p?.bottom ?? 1.6 };
+  }
+  host.addEventListener("click", (event) => {
+    const svg = event.target.closest("[data-picker]");
+    if (!svg) return;
+    Object.assign(tester, pickerPoint(svg, event.clientX, event.clientY));
+    drawPicker();
+  });
+  host.addEventListener("change", (event) => {
+    if (event.target.dataset?.pt !== "call") return;
+    // only a taken pitch (called strike or ball) can be challenged
+    const taken = event.target.value === "strike" || event.target.value === "ball";
+    const abs = field("abs");
+    abs.disabled = !taken;
+    if (!taken) abs.value = "none";
+  });
+  function throwTest() {
+    const { top, bottom } = zoneEdges();
+    const pitch = customPitch({
+      typeCode: field("type").value, call: field("call").value, abs: field("abs").value,
+      x: tester.x, z: tester.z, top, bottom, hand: state?.current?.pitcher.hand || "R",
+      balls: state?.balls ?? 0, strikes: state?.strikes ?? 0,
+    });
+    stage3d.setZone([pitch], top, bottom);
+    lastPitch = pitch; currentPitches = [pitch];
+    const seconds = stage3d.throwPitch(pitch, { showPath: true });
+    showPitchChip(pitch);
+    host.hidden = false;
+    // leave the scene alone while the pitch and its call play out (a challenge takes a few seconds longer)
+    const wait = (seconds + (pitch.challenge ? 8 : 5)) * 1000;
+    busyUntil = Date.now() + wait;
+    clearTimeout(busyTimer);
+    busyTimer = setTimeout(() => { busyUntil = 0; if (state) { stage3d?.clearPath(); lastAtBat = null; update(state); } }, wait);
+  }
 
   const onTheme = () => stage3d?.refreshTheme();
   window.addEventListener("themechange", onTheme);

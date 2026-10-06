@@ -19,15 +19,72 @@ const shade = (hex, k) => {
   return `#${f(r)}${f(g)}${f(b)}`;
 };
 
-// What makes each famous wall special. `from`/`to` are angles (degrees, negative = left field).
+// What makes each park's wall its own. `base` = wall colour, `trim` = the colour of the top edge,
+// `stripe` = a painted line along the wall, `features` = special sections (from/to are angles in
+// degrees, negative = left field): brick, stone, rocks, pool. The Monster, ivy and arches are
+// handled separately below. Colours follow each team's look; none of this is a real logo.
 const SPECIAL = {
-  "3":    { base: "#1d5a3a", seams: [-46, -10], board: -31, label: "GREEN MONSTER" },   // Fenway
-  "17":   { ivy: true },                                                                 // Wrigley
-  "2395": { base: "#8a3b2a", arches: [8, 46] },                                          // Oracle Park
-  "2":    { base: "#123a2a" },                                                           // Camden Yards
-  "3313": { base: "#14263f" },                                                           // Yankee Stadium
-  "22":   { base: "#18417a" },                                                           // Dodger Stadium
+  "1":    { base: "#0e2a52", trim: "#c8102e", stripe: "#c8102e", features: [{ kind: "rocks", from: -14, to: 14 }] },   // Angel Stadium: the rock pile
+  "10":   { base: "#1b4d2e", trim: "#ffd23f", stripe: "#ffd23f" },                                                    // Oakland Coliseum
+  "12":   { base: "#12315a", trim: "#8fbce6", stripe: "#8fbce6" },                                                    // Tropicana Field
+  "14":   { base: "#1c4a8c", trim: "#ffffff", stripe: "#e8e8e8" },                                                    // Rogers Centre
+  "15":   { base: "#1b1b22", trim: "#a71930", stripe: "#e3d4ad", features: [{ kind: "pool", from: -9, to: 9 }] },       // Chase Field: the pool
+  "17":   { ivy: true },                                                                                              // Wrigley Field
+  "19":   { base: "#1f4d34", trim: "#33006f", stripe: "#33006f" },                                                    // Coors Field
+  "2":    { base: "#123a2a", trim: "#df4601", stripe: "#df4601", features: [{ kind: "brick", from: 6, to: 46, color: "#8a3b2a" }] }, // Camden Yards: the warehouse
+  "22":   { base: "#18417a", trim: "#ffffff", stripe: "#ffffff" },                                                    // Dodger Stadium
+  "2392": { base: "#14382c", trim: "#eb6e1f", stripe: "#eb6e1f" },                                                    // Daikin Park
+  "2394": { base: "#0c2340", trim: "#fa4616", stripe: "#fa4616" },                                                    // Comerica Park
+  "2395": { base: "#8a3b2a", arches: [8, 46], trim: "#fd5a1e" },                                                      // Oracle Park
+  "2602": { base: "#1a4a2e", trim: "#c6011f", stripe: "#c6011f" },                                                    // Great American Ball Park
+  "2680": { base: "#2d2216", trim: "#ffc425", stripe: "#ffc425", features: [{ kind: "brick", from: -46, to: -30, color: "#b99a6b" }] }, // Petco Park: the warehouse in left
+  "2681": { base: "#1d4d2f", trim: "#e81828", stripe: "#e81828" },                                                    // Citizens Bank Park
+  "2889": { base: "#1a4a2e", trim: "#c41e3a", stripe: "#c41e3a" },                                                    // Busch Stadium
+  "3":    { base: "#1d5a3a", seams: [-46, -10], board: -31 },                                                         // Fenway Park: the Green Monster
+  "31":   { base: "#1b4a30", trim: "#fdb827", stripe: "#fdb827", features: [{ kind: "stone", from: 10, to: 46 }] },   // PNC Park: stone right field wall
+  "32":   { base: "#12284c", trim: "#ffc52f", stripe: "#ffc52f" },                                                    // American Family Field
+  "3289": { base: "#0e2a5b", trim: "#ff5910", stripe: "#ff5910" },                                                    // Citi Field
+  "3309": { base: "#5a1020", trim: "#ffffff", stripe: "#14225a" },                                                    // Nationals Park
+  "3312": { base: "#0c2340", trim: "#d31145", stripe: "#d31145", features: [{ kind: "stone", from: -46, to: 46, band: [0.0, 0.2] }] }, // Target Field: limestone top
+  "3313": { base: "#14263f", trim: "#c4ced4", stripe: "#c4ced4" },                                                    // Yankee Stadium
+  "4":    { base: "#17171c", trim: "#c4ced4", stripe: "#c4ced4" },                                                    // Rate Field
+  "4169": { base: "#10151c", trim: "#ff6600", stripe: "#00a3e0" },                                                    // loanDepot park
+  "4705": { base: "#10224a", trim: "#ce1141", stripe: "#ce1141" },                                                    // Truist Park
+  "5":    { base: "#0f2142", trim: "#e31937", stripe: "#e31937" },                                                    // Progressive Field
+  "5325": { base: "#0b2a55", trim: "#c0111f", stripe: "#c0111f" },                                                    // Globe Life Field
+  "680":  { base: "#0f2a44", trim: "#00a5a5", stripe: "#00a5a5" },                                                    // T-Mobile Park
+  "7":    { base: "#0f3f8a", trim: "#bd9b60", stripe: "#bd9b60" },                                                    // Kauffman Stadium
 };
+
+// special sections of the wall face
+function drawFeature(ctx, f, rand) {
+  const x0 = psiToU(f.from) * W, x1 = psiToU(f.to) * W;
+  const [ya, yb] = (f.band || [0.02, 0.56]).map((v) => v * H);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x0, ya, x1 - x0, yb - ya); ctx.clip();
+  if (f.kind === "brick") {
+    ctx.fillStyle = f.color || "#8a3b2a"; ctx.fillRect(x0, ya, x1 - x0, yb - ya);
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    for (let y = ya; y < yb; y += 14) { ctx.fillRect(x0, y, x1 - x0, 2); for (let x = x0 + ((y / 14) % 2) * 20; x < x1; x += 40) ctx.fillRect(x, y, 2, 14); }
+  } else if (f.kind === "stone") {
+    ctx.fillStyle = "#c8b58a"; ctx.fillRect(x0, ya, x1 - x0, yb - ya);
+    for (let y = ya; y < yb; y += 22) for (let x = x0; x < x1; x += 46 + rand() * 40) {
+      ctx.fillStyle = `rgba(${90 + rand() * 40},${75 + rand() * 30},${50 + rand() * 20},0.22)`; ctx.fillRect(x, y, 40 + rand() * 30, 20);
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(x, y, 2, 22); ctx.fillRect(x, y, 80, 2);
+    }
+  } else if (f.kind === "rocks") {
+    ctx.fillStyle = "#6b5f52"; ctx.fillRect(x0, ya, x1 - x0, yb - ya);
+    for (let i = 0; i < 220; i++) {
+      ctx.fillStyle = ["#8a7c6a", "#5a4f44", "#a39580", "#463d34"][Math.floor(rand() * 4)];
+      ctx.beginPath(); ctx.ellipse(x0 + rand() * (x1 - x0), ya + rand() * (yb - ya), 14 + rand() * 26, 8 + rand() * 14, rand() * 3, 0, 7); ctx.fill();
+    }
+  } else if (f.kind === "pool") {
+    ctx.fillStyle = "#4fb3d9"; ctx.fillRect(x0, ya, x1 - x0, yb - ya);
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 2;
+    for (let y = ya + 10; y < yb; y += 14) { ctx.beginPath(); for (let x = x0; x <= x1; x += 12) ctx.lineTo(x, y + Math.sin(x / 9) * 3); ctx.stroke(); }
+  }
+  ctx.restore();
+}
 
 function drawNumbers(ctx, venue) {
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -84,6 +141,9 @@ export function paintWall(venue, { width = W, height = H } = {}) {
     }
   }
 
+  for (const f of sp.features || []) drawFeature(ctx, f, rand);
+  if (sp.stripe) { ctx.fillStyle = sp.stripe; ctx.globalAlpha = 0.9; ctx.fillRect(0, H * 0.545, W, 8); ctx.globalAlpha = 1; }
+
   // panel seams (the Green Monster is built from tin panels)
   if (sp.seams) {
     const [a, b] = sp.seams.map(psiToU);
@@ -97,7 +157,7 @@ export function paintWall(venue, { width = W, height = H } = {}) {
   }
 
   // yellow top edge and painted distance numbers
-  ctx.fillStyle = "#ffd23f"; ctx.fillRect(0, 0, W, 10);
+  ctx.fillStyle = sp.trim || "#ffd23f"; ctx.fillRect(0, 0, W, 10);
   drawNumbers(ctx, venue);
   return canvas;
 }

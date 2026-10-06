@@ -549,3 +549,13 @@ button.danger { color: #ff8a93; border-color: #6b2b32; margin-top: 12px; }
 .stage-controls.pov { align-items: center; }
 .pov-label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .stage-call { animation: none; } }
+
+/* ---------- Pitch tester ---------- */
+.pitch-test { padding: 10px 12px 4px; }
+.pitch-test[hidden] { display: none; }
+.pt-row { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.pt-row label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.pt-row select { font: inherit; font-size: 14px; color: var(--text); background: var(--card-edge); border: 1px solid var(--card-edge); border-radius: 8px; padding: 6px 8px; }
+.pt-row select:disabled { opacity: 0.45; }
+.pt-zone { max-width: 260px; cursor: crosshair; touch-action: manipulation; }
+.pt-go { background: var(--accent); color: #10131a; margin: 4px 0 6px; }

@@ -78,3 +78,28 @@ export function zoneHtml(pitches, openPitch, actions) {
     <p class="zone-legend"><i style="background:#ff5b6e"></i>Called strike <i style="background:#ff9d4d"></i>Swinging <i style="background:#ffcf4a"></i>Foul <i style="background:#6cb4ff"></i>Ball <i style="background:#fff"></i>In play <i class="ring"></i>ABS challenge</p>
     <p class="note">Catcher's view. The box is this batter's real zone; the dashed edge is one ball width outside it. Tap a pitch for details.</p>`;
 }
+
+// ---------------------------------------------------------------- the pitch tester's picker
+// A small clickable zone: tap to choose where a made-up pitch crosses the plate.
+export function pickerHtml(x, z, top = 3.4, bottom = 1.6, color = "#ffcf4a") {
+  const w = (X_MAX - X_MIN) * PX, h = (Z_MAX - Z_MIN) * PX;
+  const zx = sx(-HALF_PLATE), zw = HALF_PLATE * 2 * PX, zy = sz(top), zh = (top - bottom) * PX;
+  const pad = BALL_R * PX;
+  const grid = [1, 2].map((i) =>
+    `<line x1="${zx + (zw * i) / 3}" y1="${zy}" x2="${zx + (zw * i) / 3}" y2="${zy + zh}"/>` +
+    `<line x1="${zx}" y1="${zy + (zh * i) / 3}" x2="${zx + zw}" y2="${zy + (zh * i) / 3}"/>`).join("");
+  return `<svg class="zone-svg pt-zone" data-picker viewBox="0 0 ${w} ${h}" role="img" aria-label="Tap to choose where the pitch crosses the plate">
+    <rect x="${zx - pad}" y="${zy - pad}" width="${zw + pad * 2}" height="${zh + pad * 2}" class="zone-shadow"/>
+    <rect x="${zx}" y="${zy}" width="${zw}" height="${zh}" class="zone-box"/>
+    <g class="zone-grid">${grid}</g>
+    <circle cx="${sx(x)}" cy="${sz(z)}" r="${BALL_R * PX + 3}" fill="${color}" stroke="#10131a" stroke-width="1.5"/>
+  </svg>`;
+}
+
+/** Feet (x, z) for a click or tap on the picker's SVG. */
+export function pickerPoint(svg, clientX, clientY) {
+  const r = svg.getBoundingClientRect();
+  const x = X_MIN + ((clientX - r.left) / r.width) * (X_MAX - X_MIN);
+  const z = Z_MAX - ((clientY - r.top) / r.height) * (Z_MAX - Z_MIN);
+  return { x: Math.round(Math.max(X_MIN, Math.min(X_MAX, x)) * 20) / 20, z: Math.round(Math.max(Z_MIN, Math.min(Z_MAX, z)) * 20) / 20 };
+}

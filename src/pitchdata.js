@@ -167,3 +167,68 @@ export function typeColor(typeCode) {
   if (typeCode === "KN" || typeCode === "EP") return "#ffcf4a"; // knuckleballs, eephus: gold
   return "#ffffff";
 }
+
+// ---------------------------------------------------------------- made-up pitches (the pitch tester)
+// For each pitch type: a typical speed (mph) and how much it breaks (inches), measured the way MLB
+// does it: `arm` = toward the pitcher's throwing-arm side (negative = away from it), `lift` = up
+// (negative = drops more than gravity alone would).
+export const PITCH_TYPES = {
+  FF: { name: "Four-Seam Fastball", mph: 94, arm: 8, lift: 16 },
+  SI: { name: "Sinker", mph: 93, arm: 16, lift: 8 },
+  FC: { name: "Cutter", mph: 89, arm: -2, lift: 8 },
+  SL: { name: "Slider", mph: 86, arm: -4, lift: 3 },
+  ST: { name: "Sweeper", mph: 83, arm: -14, lift: 1 },
+  CU: { name: "Curveball", mph: 79, arm: -6, lift: -9 },
+  KC: { name: "Knuckle Curve", mph: 81, arm: -5, lift: -8 },
+  CH: { name: "Changeup", mph: 85, arm: 14, lift: 7 },
+  FS: { name: "Splitter", mph: 86, arm: 8, lift: 3 },
+};
+
+/**
+ * A flight path (same shape as MLB's tracking, see pathOf) for a made-up pitch that crosses the
+ * plate at (x, z) feet. It starts at a normal release point, slows down a little, and curves the
+ * way the pitch type does. `hand` is the pitcher's throwing hand.
+ */
+export function syntheticPath(typeCode, x, z, hand = "R") {
+  const t = PITCH_TYPES[typeCode] || PITCH_TYPES.FF;
+  const arm = hand === "L" ? 1 : -1;            // a righty's arm side is the catcher's left (x < 0)
+  const x0 = arm * 1.6, y0 = 50, z0 = 5.7;      // release point: feet
+  const aY = 24, vY0 = -t.mph * 1.467;           // toward the plate, slowing down a little
+  // time until it reaches the plate (y = 0): y0 + vY0*T + aY/2*T^2 = 0
+  const T = (-vY0 - Math.sqrt(vY0 * vY0 - 2 * aY * y0)) / aY;
+  const aX = (2 * ((arm * t.arm) / 12)) / (T * T);
+  const aZ = -32.2 + (2 * (t.lift / 12)) / (T * T);
+  return {
+    x0, y0, z0, aX, aY, aZ, vY0, plateTime: T,
+    vX0: (x - x0 - 0.5 * aX * T * T) / T,
+    vZ0: (z - z0 - 0.5 * aZ * T * T) / T,
+  };
+}
+
+/**
+ * Build a pitch like the ones pitchesOf returns, from choices on the pitch tester.
+ * @param o { typeCode, x, z (feet), call: "strike"|"ball"|"swing"|"foul", abs: "none"|"overturned"|"upheld",
+ *            hand, top, bottom, balls, strikes }
+ * With an ABS challenge the call must be a taken pitch (called strike or ball); `call` is what
+ * STANDS after the challenge, and an overturned challenge means the umpire first called the opposite.
+ */
+export function customPitch(o) {
+  const type = PITCH_TYPES[o.typeCode] || PITCH_TYPES.FF;
+  const call = o.call || "strike";
+  const code = { strike: "C", ball: "B", swing: "S", foul: "F" }[call] || "C";
+  const desc = { strike: "Called Strike", ball: "Ball", swing: "Swinging Strike", foul: "Foul" }[call] || "Pitch";
+  const final = callKind({ code });
+  const taken = call === "strike" || call === "ball";
+  let challenge = null, umpCall = final;
+  if (taken && o.abs && o.abs !== "none") {
+    const overturned = o.abs === "overturned";
+    umpCall = overturned ? (final === "strike" ? "ball" : "strike") : final;
+    challenge = { teamId: 0, player: "Test batter", overturned, inProgress: false, from: umpCall, to: final };
+  }
+  return {
+    n: 1, balls: o.balls ?? 0, strikes: o.strikes ?? 0,
+    x: o.x, z: o.z, top: o.top ?? 3.4, bottom: o.bottom ?? 1.6,
+    speed: type.mph, type: type.name, typeCode: o.typeCode, call: desc, code, inPlay: false,
+    path: syntheticPath(o.typeCode, o.x, o.z, o.hand), challenge, umpCall,
+  };
+}

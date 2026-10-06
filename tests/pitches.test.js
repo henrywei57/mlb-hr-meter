@@ -109,3 +109,26 @@ test("saved pitches are grouped by game (newest first), then inning in order", (
   const innings = groups[1].innings.map((i) => i.label);
   assert.deepEqual(innings, ["Top 1st", full.pitchLog[4].label]);
 });
+
+// ---- ABS challenges and the umpire's call
+import { absBoard, callKind } from "../src/pitchdata.js";
+
+test("callKind: what the umpire signals", () => {
+  assert.equal(callKind({ code: "C" }), "strike");
+  assert.equal(callKind({ code: "S" }), "strike");
+  assert.equal(callKind({ code: "B" }), "ball");
+  assert.equal(callKind({ code: "F" }), "foul");
+  assert.equal(callKind({ code: "X", isInPlay: true }), null);
+});
+
+test("absBoard: a won challenge is kept, a lost one is spent", () => {
+  const pitch = (teamId, overturned) => ({ n: 1, challenge: { teamId, overturned, inProgress: false, from: "strike", to: overturned ? "ball" : "strike", player: "P" } });
+  const log = [{ label: "Top 1st", isTop: true, rows: [
+    { batter: { name: "B" }, pitcher: { name: "C" }, pitches: [pitch(144, true), pitch(144, false), pitch(143, false)] },
+  ] }];
+  const board = absBoard(log, { id: 143 }, { id: 144 });
+  assert.equal(board.home.left, 1);   // won one, lost one
+  assert.equal(board.home.won, 1);
+  assert.equal(board.away.left, 1);
+  assert.equal(board.log.length, 3);
+});

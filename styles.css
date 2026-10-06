@@ -518,3 +518,34 @@ button.danger { color: #ff8a93; border-color: #6b2b32; margin-top: 12px; }
 .rb-meta label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .rb-meta select { width: auto; min-height: 38px; margin: 0; padding: 0 6px; }
 .replay-bar[hidden] { display: none; }
+
+.zone-abs { color: var(--accent); font-weight: 700; font-size: 13px; }
+.zone-legend i.ring { background: none; border: 2px dashed #ffcf4a; width: 9px; height: 9px; }
+
+/* ---------- ABS challenge board ---------- */
+.abs-board { border-top: 1px solid var(--card-edge); margin-top: 10px; padding: 8px 14px 12px; font-size: 13px; }
+.abs-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; }
+.abs-title { color: var(--muted); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; font-size: 11px; margin-right: auto; }
+.abs-team { font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
+.abs-pip { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--muted); display: inline-block; }
+.abs-pip.on { background: var(--accent); border-color: var(--accent); }
+.abs-log { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; }
+.abs-log li { color: var(--muted); }
+.abs-log li b { color: var(--text); }
+.abs-log li.won { color: #4bd37b; }
+.abs-log li.lost { color: #ff9d4d; }
+.abs-log li.pending { color: var(--accent); }
+.abs-none { color: var(--muted); margin: 6px 0 0; font-size: 12px; }
+
+/* ---------- Umpire call and point-of-view buttons ---------- */
+.stage-call { position: absolute; left: 0; right: 0; top: 14%; text-align: center; pointer-events: none; color: #fff; text-shadow: 0 2px 8px #000, 0 0 2px #000; animation: banner-in 0.2s ease-out; }
+.stage-call b { display: inline-block; font-size: 34px; letter-spacing: 0.1em; padding: 2px 18px; border-radius: 10px; background: rgba(0, 0, 0, 0.45); }
+.stage-call span { display: block; font-size: 13px; font-weight: 700; margin-top: 4px; }
+.stage-call.strike b { color: #ff5b6e; }
+.stage-call.ball b { color: #6cb4ff; }
+.stage-call.foul b { color: #ffcf4a; }
+.stage-call.abs b { color: #ffcf4a; font-size: 26px; border: 2px solid #ffcf4a; }
+.stage-call.result b { font-size: 28px; }
+.stage-controls.pov { align-items: center; }
+.pov-label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .stage-call { animation: none; } }

@@ -16,7 +16,9 @@ import { webglAvailable } from "./gl.js";
 import { getVenue, wallColor } from "../venues.js";
 
 // The camera views (their positions live in scene3d.js; this is just the buttons)
-const VIEW_BUTTONS = [["catcher", "Catcher"], ["side", "Side"], ["pitcher", "Pitcher"], ["center", "Center field"], ["top", "Overhead"]];
+const VIEW_BUTTONS = [["catcher", "Broadcast"], ["side", "Side"], ["pitcher", "Pitcher"], ["center", "Center field"], ["top", "Overhead"]];
+// Point of view: see the game through each player's (or the umpire's) eyes.
+const POV_BUTTONS = [["umpPov", "Ump"], ["catcherPov", "Catcher"], ["batterPov", "Batter"], ["firstPov", "1st base"], ["secondPov", "2nd base"], ["thirdPov", "3rd base"], ["shortPov", "Shortstop"], ["outfieldPov", "Outfield"]];
 
 const handWord = (h) => (h === "L" ? "left" : "right");
 
@@ -33,7 +35,7 @@ export function createStage(host, { colors, compact = false }) {
   // 3D bookkeeping
   let lastAtBat = null, lastPitchCount = 0, lastPitch = null, lastHit = null;
   let currentPitches = [];      // the pitches of the at-bat on screen (for "replay this pitch")
-  let chipTimer = null;
+  let chipTimer = null, callTimer = null;
   let venue = null, venueId = null; // this game's ballpark (loaded once per venue)
 
   // The "speed gun": a little readout of the pitch's speed and type when it is thrown.
@@ -66,9 +68,14 @@ export function createStage(host, { colors, compact = false }) {
           <div class="stage-hud" aria-hidden="true"></div>
           <div class="stage-banner" hidden></div>
           <div class="pitch-chip" hidden></div>
+          <div class="stage-call" hidden></div>
         </div>
         <div class="stage-controls" role="toolbar" aria-label="Camera and tools">
           ${VIEW_BUTTONS.map(([k, label]) => `<button type="button" class="chip-btn" data-view="${k}">${label}</button>`).join("")}
+        </div>
+        <div class="stage-controls pov" role="toolbar" aria-label="Point of view">
+          <span class="pov-label">See it as</span>
+          ${POV_BUTTONS.map(([k, label]) => `<button type="button" class="chip-btn" data-view="${k}">${label}</button>`).join("")}
         </div>
         <div class="stage-controls tools">
           <button type="button" class="chip-btn" data-stage="pitch">Replay pitch</button>
@@ -77,7 +84,7 @@ export function createStage(host, { colors, compact = false }) {
           ${toggle}
         </div>
         <div class="stage-caption"></div>
-        <p class="note stage-tip">Drag to look around. Pinch or scroll to zoom. Double-tap to reset.</p>`;
+        <p class="note stage-tip">Drag to look around. Pinch or scroll to zoom. Double-tap to reset. In a point of view, drag to turn your head.</p>`;
     } else {
       host.innerHTML = `<div class="flat-scene"></div>${toggle ? `<div class="stage-controls tools">${toggle}</div>` : ""}`;
     }
@@ -102,6 +109,15 @@ export function createStage(host, { colors, compact = false }) {
           playCheer(!!big);
         },
         onContact: () => playCrack(),
+        onCall: (step, { hold }) => {
+          const el = host.querySelector(".stage-call");
+          if (!el) return;
+          el.className = `stage-call ${step.kind}${step.result ? " result" : ""}`;
+          el.innerHTML = `<b>${esc(step.text)}</b>${step.sub ? `<span>${esc(step.sub)}</span>` : ""}`;
+          el.hidden = false;
+          clearTimeout(callTimer);
+          callTimer = setTimeout(() => { el.hidden = true; }, hold * 1000 - 100);
+        },
         onBannerHide: () => { const el = host.querySelector(".stage-banner"); if (el) el.hidden = true; },
         onHitDone: () => { busyUntil = 0; if (state) update(state); },
       });
